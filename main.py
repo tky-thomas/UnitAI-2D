@@ -41,6 +41,8 @@ class UnitAI2D(arcade.Window):
         # Call draw() on all your sprite lists below
         self.gridEntity.draw()
 
+        # The Environment holds all entities, so we draw here
+        self.environment.draw()
 
     def on_update(self, delta_time):
         """

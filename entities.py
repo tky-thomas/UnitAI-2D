@@ -20,3 +20,24 @@ class Grid:
 
     def toggle_grid(self):
         self.toggle = not self.toggle
+
+
+class Player(arcade.Sprite):
+
+    def __init__(self, spawn_pos_grid, grid_width=20):
+        super().__init__()
+        self.pos = spawn_pos_grid
+
+        # Position the player
+        self.height = grid_width
+        self.width = grid_width
+        self.center_x = (spawn_pos_grid[0] * grid_width) + round(grid_width / 2)
+        self.center_y = (spawn_pos_grid[1] * grid_width) + round(grid_width / 2)
+
+        self.grid_width = grid_width
+
+    def draw(self, **kwargs):
+        # Draws a red square
+        arcade.draw_rectangle_filled(self.center_x, self.center_y, self.width, self.height,
+                                     arcade.color.RED)
+
