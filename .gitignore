@@ -1,0 +1,4 @@
+# Ignores all non-code files
+.idea
+venv
+Documentation
