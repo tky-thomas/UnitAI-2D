@@ -2,11 +2,13 @@
 File for generating the game map by spawning in both obstacles and game entities.
 Responsible for maintaining a list of all entities,
 and relaying this information to game objects.
-Also responsible for generating new enemy entities as they are killed.
+Also, responsible for generating new enemy entities as they are killed.
 """
 import numpy as np
+from entities import Player
 
 GRID_SIZE = 20
+
 
 class Environment:
     def __init__(self, window_width, window_height):
@@ -14,17 +16,20 @@ class Environment:
         self.window_height = window_height
 
         # All environment information is represented as a 2D tuple
-        grids_x = round(window_width / GRID_SIZE)
-        grids_y = round(window_height / GRID_SIZE)
-        self.grid = np.zeros((grids_y, grids_x))
+        self.grids_x = round(window_width / GRID_SIZE)
+        self.grids_y = round(window_height / GRID_SIZE)
+        self.grid = np.zeros((self.grids_y, self.grids_x))
 
-        print(len(self.grid[0]))
+        self.player = None
+        self.generate_world()
 
     def generate_world(self):
-        pass
+        # Spawns in the player at the center grid
+        self.player = Player((round(self.grids_x / 2),
+                              round(self.grids_y / 2)))
 
-    def spawn_entity(self, grid_pos):
-        pass
+    def draw(self):
+        self.player.draw()
 
     def get_map(self):
         pass
