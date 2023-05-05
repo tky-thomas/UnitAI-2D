@@ -45,8 +45,8 @@ class UnitAI2D(arcade.Window):
     def on_key_press(self, key, key_modifiers):
 
         # Toggles the grid
-        if key is arcade.key.G:
-            self.environment.toggle_grid()
+        self.environment.toggle_visual(key)
+
 
     def on_key_release(self, key, key_modifiers):
         """

@@ -16,7 +16,7 @@ GRID_SIZE = 20
 MAP_OBSTACLES = [[(5, 5, 9, 9), (25, 5, 7, 7), (5, 20, 5, 5), (20, 20, 5, 5)]]
 MAP_ID = 0
 
-ENEMY_COUNT = 10
+ENEMY_COUNT = 5
 SPAWN_RADIUS = 4
 
 PLAYER = 1
@@ -26,9 +26,10 @@ OBSTACLE = 3
 
 class Environment:
 
-    def __init__(self, window_width, window_height):
+    def __init__(self, window_width, window_height, update_freq=1):
         self.window_width = window_width
         self.window_height = window_height
+        self.update_freq = update_freq
 
         # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
@@ -46,7 +47,8 @@ class Environment:
     def generate_world(self):
         # Spawns in the player at the center grid
         self.player = Player((round(self.grids_x / 2),
-                              round(self.grids_y / 2)))
+                              round(self.grids_y / 2)),
+                             update_freq=self.update_freq)
 
         # Generates the obstacles
         self.obstacles = arcade.SpriteList()
@@ -69,8 +71,13 @@ class Environment:
         self.enemies = arcade.SpriteList()
         for i in range(ENEMY_COUNT):
             # Pick a spawn location for the enemy
-            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid))
+            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq)
             self.enemies.append(enemy_sprite)
+
+        # Updates grid knowledge
+        self.grid = self.get_map()
+        for enemy in self.enemies:
+            enemy.update_grid(self.grid)
 
     def draw(self):
         self.player.draw()
@@ -131,8 +138,12 @@ class Environment:
                                  text=str(int(column)),
                                  color=arcade.color.GRAY)
 
-    def toggle_grid(self):
-        self.show_grid = not self.show_grid
+    def toggle_visual(self, key):
+        if key == arcade.key.G:
+            self.show_grid = not self.show_grid
+        elif key == arcade.key.P:
+            for enemy in self.enemies:
+                enemy.toggle_path_draw()
 
 
 def get_grid_pos(sprite: arcade.Sprite):
