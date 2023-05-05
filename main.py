@@ -9,7 +9,6 @@ python -m arcade.examples.starting_template
 """
 import arcade
 from environment import Environment
-from entities import Grid
 
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
@@ -24,24 +23,15 @@ class UnitAI2D(arcade.Window):
 
         self.environment = None
 
-        # The game grid
-        self.gridEntity = None
-
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
         self.environment = Environment(self.width, self.height)
-        self.gridEntity = Grid(self.width, self.height, self.environment.get_gridsize())
 
     def on_draw(self):
         """
         Render the screen.
         """
         self.clear()
-
-        # Call draw() on all your sprite lists below
-        self.gridEntity.draw()
-
-        # The Environment holds all entities, so we draw here
         self.environment.draw()
 
     def on_update(self, delta_time):
@@ -50,13 +40,13 @@ class UnitAI2D(arcade.Window):
         Normally, you'll call update() on the sprite lists that
         need it.
         """
-        pass
+        self.environment.update(delta_time)
 
     def on_key_press(self, key, key_modifiers):
 
         # Toggles the grid
         if key is arcade.key.G:
-            self.gridEntity.toggle_grid()
+            self.environment.toggle_grid()
 
     def on_key_release(self, key, key_modifiers):
         """
