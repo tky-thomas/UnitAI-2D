@@ -138,8 +138,12 @@ class Environment:
                                  text=str(int(column)),
                                  color=arcade.color.GRAY)
 
-    def toggle_grid(self):
-        self.show_grid = not self.show_grid
+    def toggle_visual(self, key):
+        if key == arcade.key.G:
+            self.show_grid = not self.show_grid
+        elif key == arcade.key.P:
+            for enemy in self.enemies:
+                enemy.toggle_path_draw()
 
 
 def get_grid_pos(sprite: arcade.Sprite):

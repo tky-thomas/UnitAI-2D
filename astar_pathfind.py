@@ -12,7 +12,7 @@ class AStarNode:
         self.parent = parent
 
 
-def astar_pathfind(grid, start_pos, target_pos, obstacles=(3,)):
+def pathfind(grid, start_pos, target_pos, obstacles=(3,)):
     open_list = list()
     closed_list = list()
 
@@ -23,6 +23,7 @@ def astar_pathfind(grid, start_pos, target_pos, obstacles=(3,)):
     while True:
         # If the open list is empty, there is no path. Return None.
         if len(open_list) == 0:
+            print("No path found boi")
             return None
 
         # Find the lowest cost square on the open list
@@ -34,6 +35,7 @@ def astar_pathfind(grid, start_pos, target_pos, obstacles=(3,)):
             while True:
                 path.append(current_node.pos)
                 if current_node.parent is None:
+                    path.reverse()
                     return path
                 current_node = current_node.parent
 
@@ -45,6 +47,8 @@ def astar_pathfind(grid, start_pos, target_pos, obstacles=(3,)):
             for x in range(current_node.pos[0] - 1, current_node.pos[0] + 1):
                 pos = (x, y)
                 # Check if walkable or in closed list
+                if x < 0 or y < 0:
+                    continue
                 if grid[y][x] in obstacles or pos_in_list(pos, closed_list):
                     continue
 
