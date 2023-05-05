@@ -6,12 +6,16 @@ Also, responsible for generating new enemy entities as they are killed.
 """
 import arcade.sprite
 import numpy as np
-from entities import Player, Obstacle
+import random
+from entities import *
 
 GRID_SIZE = 20
 
 MAP_OBSTACLES = [[(5, 5, 9, 9), (25, 5, 7, 7), (5, 20, 5, 5), (20, 20, 5, 5)]]
 MAP_ID = 0
+
+ENEMY_COUNT = 10
+SPAWN_RADIUS = 4
 
 
 class Environment:
@@ -23,9 +27,11 @@ class Environment:
         self.grids_x = round(window_width / GRID_SIZE)
         self.grids_y = round(window_height / GRID_SIZE)
         self.grid = np.zeros((self.grids_y, self.grids_x))
+        self.enemy_spawn_grid = None
 
         self.player = None
         self.obstacles = None
+        self.enemies = None
         self.generate_world()
 
     def generate_world(self):
@@ -39,10 +45,28 @@ class Environment:
             obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
             self.obstacles.append(obstacle_sprite)
 
+        # Sets up a list to spawn enemies
+        # Enemies will be spawned along the borders of the map
+        self.enemy_spawn_grid = []
+        for row in range(self.grids_y):
+            for column in range(self.grids_x):
+                if (column < SPAWN_RADIUS or column > (self.grids_x - SPAWN_RADIUS)) \
+                        or (row < SPAWN_RADIUS or row > (self.grids_y - SPAWN_RADIUS)):
+                    self.enemy_spawn_grid.append((column, row))
+
+        # Generates an initial batch of enemy units
+        self.enemies = arcade.SpriteList()
+        for i in range(ENEMY_COUNT):
+            # Pick a spawn location for the enemy
+            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid))
+            self.enemies.append(enemy_sprite)
+
     def draw(self):
         self.player.draw()
         for obstacle in self.obstacles:
             obstacle.draw()
+        for enemy in self.enemies:
+            enemy.draw()
 
     def get_map(self):
         pass
