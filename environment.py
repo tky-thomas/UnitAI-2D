@@ -25,6 +25,7 @@ OBSTACLE = 3
 
 
 class Environment:
+
     def __init__(self, window_width, window_height):
         self.window_width = window_width
         self.window_height = window_height
@@ -86,6 +87,9 @@ class Environment:
         self.player.update()
         self.enemies.on_update(delta_time)
 
+        # Updates the game map
+        self.grid = self.get_map()
+
     def get_map(self):
         # Start with an empty grid
         grid = np.zeros((self.grids_y, self.grids_x))
@@ -109,9 +113,6 @@ class Environment:
     def get_entity_list(self):
         pass
 
-    def get_gridsize(self):
-        return round(self.window_width / len(self.grid[0]))
-
     def draw_grid(self):
         # Draws a gray-bordered grid to help visualize the map
         for i in range(0, self.window_height, GRID_SIZE):
@@ -120,7 +121,15 @@ class Environment:
             arcade.draw_line(i, 0, i, self.window_height, color=arcade.color.GRAY, line_width=GRID_SIZE / 10)
 
         # Draws a number of top of every entity on the grid
-
+        for y, row in enumerate(self.grid):
+            for x, column in enumerate(row):
+                if column == 0:
+                    continue
+                arcade.draw_text(start_x=round((x * GRID_SIZE) + (GRID_SIZE / 2)),
+                                 start_y=round((y * GRID_SIZE) + (GRID_SIZE / 2)),
+                                 anchor_x="center", anchor_y="center",
+                                 text=str(int(column)),
+                                 color=arcade.color.GRAY)
 
     def toggle_grid(self):
         self.show_grid = not self.show_grid
