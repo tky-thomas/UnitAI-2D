@@ -16,8 +16,6 @@ MAP_ID = 0
 ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
 
-UPDATE_FREQUENCY = 0.1
-
 PLAYER = 1
 ENEMY = 2
 OBSTACLE = 3
@@ -25,7 +23,7 @@ OBSTACLE = 3
 
 class Environment:
 
-    def __init__(self, window_width, window_height, update_freq=UPDATE_FREQUENCY):
+    def __init__(self, window_width, window_height, update_freq=1):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq

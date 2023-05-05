@@ -7,6 +7,7 @@ import numpy as np
 PLAYER = 1
 ENEMY = 2
 OBSTACLE = 3
+UNIT_MARKER = 5
 
 PATHFIND_CYCLES = 3
 
@@ -133,6 +134,17 @@ class Enemy(arcade.Sprite):
 
     def update_grid(self, grid: np.array):
         self.grid = grid
+
+    def get_personal_grid(self):
+        """
+        Returns a grid, but annotated with the personal position of this unit.
+        Very importantly, used to feed the input of the neural net.
+        :return: The environment grid, but with the personal position added in.
+        """
+        pos = self.get_self_pos()
+        ret = self.grid
+        ret[pos[1]][pos[0]] = UNIT_MARKER
+        return ret
 
     def toggle_path_draw(self):
         self.draw_path = not self.draw_path
