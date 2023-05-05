@@ -3,9 +3,10 @@ import arcade
 
 class Player(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, grid_width=20):
+    def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1):
         super().__init__()
         self.pos = spawn_pos_grid
+        self.update_freq = update_freq
 
         # Position the player
         self.height = grid_width
@@ -42,9 +43,10 @@ class Obstacle(arcade.Sprite):
 
 class Enemy(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, attack_range=2, grid_width=20):
+    def __init__(self, spawn_pos_grid, attack_range=2, grid_width=20, update_freq=1):
         super().__init__()
         self.pos = spawn_pos_grid
+        self.update_freq = update_freq
 
         # Position the enemy
         self.height = grid_width
@@ -52,6 +54,8 @@ class Enemy(arcade.Sprite):
         self.center_x = (spawn_pos_grid[0] * grid_width) + round(grid_width / 2)
         self.center_y = (spawn_pos_grid[1] * grid_width) + round(grid_width / 2)
         self.grid_width = grid_width
+
+        self.grid = None
 
         # Enemy attributes
         self.range = attack_range
@@ -62,5 +66,13 @@ class Enemy(arcade.Sprite):
                                      arcade.color.BLUE)
 
     def on_update(self, delta_time: float = 1 / 60):
+        # Check if should be attacking player
+        # Check if at destination grid. If so, find new target
+        # Check if should retarget
         pass
+
+    def update_grid(self, grid):
+        self.grid = grid
+
+
 
