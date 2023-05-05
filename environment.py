@@ -16,7 +16,7 @@ GRID_SIZE = 20
 MAP_OBSTACLES = [[(5, 5, 9, 9), (25, 5, 7, 7), (5, 20, 5, 5), (20, 20, 5, 5)]]
 MAP_ID = 0
 
-ENEMY_COUNT = 10
+ENEMY_COUNT = 5
 SPAWN_RADIUS = 4
 
 PLAYER = 1

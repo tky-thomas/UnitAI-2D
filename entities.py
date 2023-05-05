@@ -84,10 +84,10 @@ class Enemy(arcade.Sprite):
                                  ((next_step[0] * self.grid_width) + self.grid_width / 2),
                                  ((next_step[1] * self.grid_width) + self.grid_width / 2),
                                  color=arcade.color.AERO_BLUE,
-                                 line_width=2)
+                                 line_width=1)
                 arcade.draw_circle_filled(((current_step[0] * self.grid_width) + self.grid_width / 2),
                                           ((current_step[1] * self.grid_width) + self.grid_width / 2),
-                                          radius=5,
+                                          radius=3,
                                           color=arcade.color.AERO_BLUE)
 
     def on_update(self, delta_time: float = 1 / 60):
@@ -99,7 +99,7 @@ class Enemy(arcade.Sprite):
 
         # Pathfind to player
         target_pos = np.where(self.grid == PLAYER)
-        target_pos = (target_pos[1], target_pos[0])
+        target_pos = (int(target_pos[1]), int(target_pos[0]))
         self.path = astar.pathfind(self.grid, self.pos, target_pos, obstacles=(OBSTACLE,))
 
     def update_grid(self, grid: np.array):

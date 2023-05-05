@@ -23,11 +23,10 @@ def pathfind(grid, start_pos, target_pos, obstacles=(3,)):
     while True:
         # If the open list is empty, there is no path. Return None.
         if len(open_list) == 0:
-            print("No path found boi")
             return None
 
         # Find the lowest cost square on the open list
-        current_node = max(open_list, key=lambda n: n.f)
+        current_node = min(open_list, key=lambda n: n.f)
 
         # If node is target, retrace path
         if current_node.pos == target_pos:
@@ -42,20 +41,20 @@ def pathfind(grid, start_pos, target_pos, obstacles=(3,)):
         open_list.remove(current_node)
         closed_list.append(current_node)
 
-        # Get adjacent nodes
-        for y in range(current_node.pos[1] - 1, current_node.pos[1] + 1):
-            for x in range(current_node.pos[0] - 1, current_node.pos[0] + 1):
+        # Scan all the nodes adjacent to the current node
+        for y in range(current_node.pos[1] - 1, current_node.pos[1] + 2):
+            for x in range(current_node.pos[0] - 1, current_node.pos[0] + 2):
                 pos = (x, y)
                 # Check if walkable or in closed list
-                if x < 0 or y < 0:
+                if x < 0 or y < 0 or x >= len(grid[0]) or y >= len(grid):
                     continue
                 if grid[y][x] in obstacles or pos_in_list(pos, closed_list):
                     continue
 
-                if pos_in_list(pos, open_list):
+                node = get_node_in_list(pos, open_list)
+                if node is not None:
                     # Checks if the current node provides a better path
-                    node = get_node_in_list(pos, open_list)
-                    if current_node.g + 1 < node.g:
+                    if node.g < current_node.g + 1:
                         node.update(current_node.g + 1, current_node)
                 else:
                     # Adds the node to the open list if not existing
