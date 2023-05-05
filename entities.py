@@ -17,6 +17,8 @@ class Player(arcade.Sprite):
         self.pos = spawn_pos_grid
         self.update_freq = update_freq
 
+        self.damage_received = 0
+
         # Position the player
         self.height = grid_width
         self.width = grid_width
@@ -29,6 +31,9 @@ class Player(arcade.Sprite):
         # Draws a red square
         arcade.draw_rectangle_filled(self.center_x, self.center_y, self.width, self.height,
                                      arcade.color.RED)
+
+    def damage(self, damage):
+        self.damage_received += damage
 
 
 class Obstacle(arcade.Sprite):
@@ -52,7 +57,7 @@ class Obstacle(arcade.Sprite):
 
 class Enemy(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, attack_range=2, grid_width=20, update_freq=1):
+    def __init__(self, spawn_pos_grid, attack_range=2, grid_width=20, update_freq=1, player=None):
         super().__init__()
         self.pos = spawn_pos_grid
         self.update_freq = update_freq
@@ -62,6 +67,8 @@ class Enemy(arcade.Sprite):
         self.path = list()
         self.pathfind_cycles = PATHFIND_CYCLES
         self.pathfind_cycle_threshold = PATHFIND_CYCLES
+
+        self.player = player
 
         # Position the enemy
         self.height = grid_width
@@ -113,7 +120,7 @@ class Enemy(arcade.Sprite):
             self.path = astar.pathfind(self.grid, self.get_self_pos(), target_pos, obstacles=(OBSTACLE,))
 
         # Move along path, deleting trails
-        # If not moving, enemies can damage the player with projectiles if in range
+        # If not moving, enemies can damage the player if in range
         if len(self.path) > 0:
             move_pos = self.path[0]
             self.center_x = ((move_pos[0] * self.grid_width) + self.grid_width / 2)
@@ -122,7 +129,7 @@ class Enemy(arcade.Sprite):
         else:
             if self.player_in_range():
                 # Deal damage to the player
-                pass
+                self.player.damage(1)
 
     def update_grid(self, grid: np.array):
         self.grid = grid

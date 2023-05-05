@@ -43,6 +43,12 @@ class Environment:
         self.enemies = None
         self.generate_world()
 
+        self.damage_text = arcade.Text("",
+                                       start_x=self.window_width / 15,
+                                       start_y=self.window_height - (self.window_height / 10),
+                                       color=arcade.color.AERO_BLUE,
+                                       font_size=15)
+
     def generate_world(self):
         # Spawns in the player at the center grid
         self.player = Player((round(self.grids_x / 2),
@@ -55,7 +61,7 @@ class Environment:
             obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
             self.obstacles.append(obstacle_sprite)
 
-        # Gets an obstacle list and exclude enemy spawnpoints from these locations
+        # TODO: Gets an obstacle list and exclude enemy spawnpoints from these locations
 
         # Sets up a list to spawn enemies
         # Enemies will be spawned along the borders of the map
@@ -70,7 +76,7 @@ class Environment:
         self.enemies = arcade.SpriteList()
         for i in range(ENEMY_COUNT):
             # Pick a spawn location for the enemy
-            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq)
+            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
             self.enemies.append(enemy_sprite)
 
         # Updates grid knowledge
@@ -78,12 +84,19 @@ class Environment:
         for enemy in self.enemies:
             enemy.update_grid(self.grid)
 
+        # Sets up a player damage text
+        # self.damage_text =
+
     def draw(self):
         self.player.draw()
         for obstacle in self.obstacles:
             obstacle.draw()
         for enemy in self.enemies:
             enemy.draw()
+
+        # Draw player damage received
+        self.damage_text.text = "Damage: " + str(self.player.damage_received)
+        self.damage_text.draw()
 
         if self.show_grid:
             self.draw_grid()
@@ -143,6 +156,7 @@ class Environment:
         elif key == arcade.key.P:
             for enemy in self.enemies:
                 enemy.toggle_path_draw()
+
 
 
 def get_grid_pos(sprite: arcade.Sprite):
