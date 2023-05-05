@@ -4,10 +4,7 @@ Responsible for maintaining a list of all entities,
 and relaying this information to game objects.
 Also, responsible for generating new enemy entities as they are killed.
 """
-import math
-
 import arcade.sprite
-import numpy as np
 import random
 from entities import *
 
@@ -16,8 +13,10 @@ GRID_SIZE = 20
 MAP_OBSTACLES = [[(5, 5, 9, 9), (25, 5, 7, 7), (5, 20, 5, 5), (20, 20, 5, 5)]]
 MAP_ID = 0
 
-ENEMY_COUNT = 5
+ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
+
+UPDATE_FREQUENCY = 0.25
 
 PLAYER = 1
 ENEMY = 2
@@ -26,7 +25,7 @@ OBSTACLE = 3
 
 class Environment:
 
-    def __init__(self, window_width, window_height, update_freq=1):
+    def __init__(self, window_width, window_height, update_freq=UPDATE_FREQUENCY):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
