@@ -79,10 +79,10 @@ class Enemy(arcade.Sprite):
         arcade.draw_rectangle_filled(self.center_x, self.center_y, self.width, self.height,
                                      arcade.color.BLUE)
         # If indicated, draw the path to the player
-        if self.draw_path and len(self.path) != 0:
+        if self.draw_path:
             for i in range(len(self.path)):
-                # Do not draw for the last node
-                if i + 1 == len(self.path):
+                # Do not draw a connecting line for the last node
+                if i + 1 >= len(self.path):
                     continue
                 current_step = self.path[i]
                 next_step = self.path[i + 1]
@@ -106,20 +106,23 @@ class Enemy(arcade.Sprite):
         self.pathfind_cycles += 1
 
         # Pathfind to player, reloading the pathfinder if necessary
+        # TODO: This is a placeholder. Eventually the reinforcement AI will decide when to pathfind to player
         if self.pathfind_cycles >= self.pathfind_cycle_threshold:
             self.pathfind_cycles = 0
-            target_pos = np.where(self.grid == PLAYER)
-            target_pos = (int(target_pos[1]), int(target_pos[0]))
+            target_pos = self.get_player_pos()
             self.path = astar.pathfind(self.grid, self.get_self_pos(), target_pos, obstacles=(OBSTACLE,))
 
         # Move along path, deleting trails
-        if len(self.path) <= 1:
-            self.path = list()
-        else:
-            move_pos = self.path[1]
+        # If not moving, enemies can damage the player with projectiles if in range
+        if len(self.path) > 0:
+            move_pos = self.path[0]
             self.center_x = ((move_pos[0] * self.grid_width) + self.grid_width / 2)
             self.center_y = ((move_pos[1] * self.grid_width) + self.grid_width / 2)
             self.path.remove(self.path[0])
+        else:
+            if self.player_in_range():
+                # Deal damage to the player
+                pass
 
     def update_grid(self, grid: np.array):
         self.grid = grid
@@ -127,8 +130,17 @@ class Enemy(arcade.Sprite):
     def toggle_path_draw(self):
         self.draw_path = not self.draw_path
 
+    def player_in_range(self):
+        target_pos = self.get_player_pos()
+        self_pos = self.get_self_pos()
+        if math.sqrt(pow(target_pos[0] - self_pos[0], 2) + pow(target_pos[1] - self_pos[1], 2)) <= self.range:
+            return True
+        return False
+
     def get_self_pos(self):
-        return (math.floor(self.center_x / self.grid_width), math.floor(self.center_y / self.grid_width))
+        return math.floor(self.center_x / self.grid_width), math.floor(self.center_y / self.grid_width)
 
-
-
+    def get_player_pos(self):
+        target_pos = np.where(self.grid == PLAYER)
+        target_pos = (target_pos[1], target_pos[0])
+        return target_pos
