@@ -24,6 +24,8 @@ UPDATE_FREQUENCY = 0.1
 
 # Machine learning hyperparameters
 LR = 0.01
+EPSILON = 0.3
+EPSILON_DECAY_STEPS = 1000
 
 # Random Seed
 RANDOM_SEED = None
@@ -79,7 +81,7 @@ class UnitAI2D(arcade.Window):
         # ====================
         # MODEL
         # ====================
-        self.model = DeepQNetwork_FullMap()
+        self.model = DeepQNetwork_FullMap(random_action_chance=EPSILON, random_decay_steps=EPSILON_DECAY_STEPS)
         print('\nModel:')
         print(self.model)
 

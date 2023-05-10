@@ -1,10 +1,13 @@
 import torch.nn as nn
 import torch
+import random
 
 
 class DeepQNetwork_FullMap(nn.Module):
-    def __init__(self):
+    def __init__(self, num_actions=5, random_action_chance=0.3, random_decay_steps=1000):
         super().__init__()
+        self.num_actions = num_actions
+        self.random_chance =
 
         C1, C2, C3 = 3, 7, 14
         self.cnn_model = nn.Sequential(
@@ -14,7 +17,7 @@ class DeepQNetwork_FullMap(nn.Module):
         )
         self.action_selector = nn.Sequential(
             nn.Linear(C3, 100),
-            nn.Linear(100, 5),
+            nn.Linear(100, num_actions),
             nn.Softmax()
         )
 
@@ -30,6 +33,10 @@ class DeepQNetwork_FullMap(nn.Module):
         Select an action based on the agent's prediction.
         Random chance of exploring a random move.
         """
+        action = torch.argmax(x)
+        if random.random() < RANDOM_ACTION_CHANCE:
+            action = random.randint(0, self.num_actions - 1)
+        return action
 
 
 class CNNReceptiveChunk(nn.Module):
