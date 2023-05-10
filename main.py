@@ -9,6 +9,7 @@ python -m arcade.examples.starting_template
 """
 import arcade
 from environment import Environment
+import random
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -24,6 +25,10 @@ UPDATE_FREQUENCY = 0.1
 # Machine learning hyperparameters
 LR = 0.01
 
+# Random Seed
+RANDOM_SEED = None
+
+
 class UnitAI2D(arcade.Window):
 
     def __init__(self, width, height, title):
@@ -32,7 +37,7 @@ class UnitAI2D(arcade.Window):
 
         self.environment = None
         self.update_timer = None
-        self.update_frequency = None
+        self.update_freq = None
 
         # Deep Q Learning model
         self.model = None
@@ -42,8 +47,8 @@ class UnitAI2D(arcade.Window):
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
         self.update_timer = 0
-        self.update_frequency = UPDATE_FREQUENCY
-        self.environment = Environment(self.width, self.height, self.update_frequency)
+        self.update_freq = UPDATE_FREQUENCY
+        self.environment = Environment(self.width, self.height, self.update_freq)
 
         self.machine_learning_setup()
 
@@ -102,10 +107,9 @@ class UnitAI2D(arcade.Window):
         print(optimizer)
 
 
-
-
-
 def main():
+    random.seed(RANDOM_SEED)
+
     """ Main function """
     game = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
     game.setup()
