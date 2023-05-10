@@ -105,7 +105,7 @@ class Enemy(arcade.Sprite):
                                           radius=3,
                                           color=arcade.color.AERO_BLUE)
 
-    def on_update(self, delta_time: float = 1 / 60):
+    def update_with_action(self, action, delta_time: float = 1 / 60):
         # Update timer
         self.update_timer += delta_time
         if self.update_timer < self.update_freq:

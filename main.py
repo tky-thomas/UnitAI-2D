@@ -20,7 +20,7 @@ WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
 
-UPDATE_FREQUENCY = 0.1
+UPDATE_FREQUENCY = 1
 
 # Machine learning hyperparameters
 LR = 0.01
@@ -68,9 +68,21 @@ class UnitAI2D(arcade.Window):
             return
         self.update_timer = 0
 
-        # Deep-Q Learning solution chooses an action to perform, for each enemy
+        # Model returns information about all units
+        state_maps = self.environment.get_state_maps()
 
-        self.environment.update(delta_time)
+        # For each unit, the model selects an action
+        action_list = list()
+        for state_map in state_maps:
+            # Convert each state map into a tensor
+            state_map = torch.Tensor(state_map)
+            state_map = state_map.unsqueeze(0)
+
+            action_tensor = self.model(state_map)
+            action_list.append(self.model.action_translate(action_tensor))
+
+        # Action is fed back into the network
+        self.environment.update(delta_time, action_list)
 
     def on_key_press(self, key, key_modifiers):
 

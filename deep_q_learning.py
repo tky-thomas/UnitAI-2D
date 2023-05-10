@@ -18,9 +18,9 @@ class DeepQNetwork_FullMap(nn.Module):
             CNNReceptiveChunk(C2, C3)
         )
         self.action_selector = nn.Sequential(
-            nn.Linear(C3, 100),
+            nn.Linear(210, 100),
             nn.Linear(100, num_actions),
-            nn.Softmax()
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x):
@@ -51,9 +51,9 @@ class CNNReceptiveChunk(nn.Module):
         self.out_channels = out_channels
 
         self.net = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1),
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2, stride=2),
             nn.BatchNorm2d(out_channels)

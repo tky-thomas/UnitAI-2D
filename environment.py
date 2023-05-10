@@ -19,6 +19,7 @@ SPAWN_RADIUS = 4
 PLAYER = 1
 ENEMY = 2
 OBSTACLE = 3
+ENEMY_FOCUSED = 10
 
 
 class Environment:
@@ -99,10 +100,13 @@ class Environment:
         if self.show_grid:
             self.draw_grid()
 
-    def update(self, delta_time):
+    def update(self, delta_time, action_list):
         # Updates the player and enemies
         self.player.update()
-        self.enemies.on_update(delta_time)
+
+        # Updates each enemy with an action
+        for i, enemy in enumerate(self.enemies):
+            enemy.update_with_action(action_list[i], delta_time)
 
         # Updates the game map
         self.grid = self.get_map()
@@ -126,6 +130,20 @@ class Environment:
             grid[y][x] = ENEMY
 
         return grid
+
+    def get_state_maps(self):
+        state_maps = list()
+        for enemy in self.enemies:
+            state_map = self.grid.copy()
+            x, y = get_grid_pos(enemy)
+            state_map[y][x] = ENEMY_FOCUSED
+
+            # Adds one channel dimension to the state map
+            state_map = np.expand_dims(state_map, axis=0)
+
+            state_maps.append(state_map)
+
+        return state_maps
 
     def get_entity_list(self):
         pass
@@ -154,7 +172,6 @@ class Environment:
         elif key == arcade.key.P:
             for enemy in self.enemies:
                 enemy.toggle_path_draw()
-
 
 
 def get_grid_pos(sprite: arcade.Sprite):
