@@ -9,10 +9,26 @@ python -m arcade.examples.starting_template
 """
 import arcade
 from environment import Environment
+import random
+
+import torch
+import torch.backends.cudnn as cudnn
+import torch.optim as optim
+from deep_q_learning import DeepQNetwork_FullMap
 
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
+
+UPDATE_FREQUENCY = 1
+
+# Machine learning hyperparameters
+LR = 0.01
+EPSILON = 0.3
+EPSILON_DECAY_RATE = 0.9
+
+# Random Seed
+RANDOM_SEED = None
 
 
 class UnitAI2D(arcade.Window):
@@ -22,10 +38,21 @@ class UnitAI2D(arcade.Window):
         arcade.set_background_color(arcade.color.AMAZON)
 
         self.environment = None
+        self.update_timer = None
+        self.update_freq = None
+
+        # Deep Q Learning model
+        self.model = None
+        self.device = None
+        self.optimizer = None
 
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
-        self.environment = Environment(self.width, self.height)
+        self.update_timer = 0
+        self.update_freq = UPDATE_FREQUENCY
+        self.environment = Environment(self.width, self.height, self.update_freq)
+
+        self.machine_learning_setup()
 
     def on_draw(self):
         """
@@ -35,45 +62,68 @@ class UnitAI2D(arcade.Window):
         self.environment.draw()
 
     def on_update(self, delta_time):
-        """
-        All the logic to move, and the game logic goes here.
-        Normally, you'll call update() on the sprite lists that
-        need it.
-        """
-        self.environment.update(delta_time)
+        # Update timer
+        self.update_timer += delta_time
+        if self.update_timer < self.update_freq:
+            return
+        self.update_timer = 0
+
+        # Model returns information about all units
+        state_maps = self.environment.get_state_maps()
+
+        # For each unit, the model selects an action
+        action_list = list()
+        for state_map in state_maps:
+            # Convert each state map into a tensor
+            state_map = torch.Tensor(state_map)
+            state_map = state_map.unsqueeze(0)
+
+            action_tensor = self.model(state_map)
+            action_list.append(self.model.action_translate(action_tensor))
+
+        # Action is fed back into the network
+        self.environment.update(delta_time, action_list)
 
     def on_key_press(self, key, key_modifiers):
 
         # Toggles the grid
         self.environment.toggle_visual(key)
 
+    def machine_learning_setup(self):
+        # ====================
+        # MODEL
+        # ====================
+        self.model = DeepQNetwork_FullMap(random_action_chance=EPSILON, random_decay_rate=EPSILON_DECAY_RATE)
+        print('\nModel:')
+        print(self.model)
 
-    def on_key_release(self, key, key_modifiers):
-        """
-        Called whenever the user lets off a previously pressed key.
-        """
-        pass
+        use_cuda = torch.cuda.is_available()
+        self.device = torch.device('cuda' if use_cuda else 'cpu')
+        print('Device: {}'.format(self.device))
 
-    def on_mouse_motion(self, x, y, delta_x, delta_y):
-        """
-        Called whenever the mouse moves.
-        """
-        pass
+        if use_cuda:
+            cudnn.enabled = True
+            cudnn.benchmark = True
+            print('CUDNN is enabled. CUDNN benchmark is enabled')
+            self.model.cuda()
 
-    def on_mouse_press(self, x, y, button, key_modifiers):
-        """
-        Called when the user presses a mouse button.
-        """
-        pass
+        params = [p.nelement() for p in self.model.parameters() if p.requires_grad]
+        num_params = sum(params)
 
-    def on_mouse_release(self, x, y, button, key_modifiers):
-        """
-        Called when a user releases a mouse button.
-        """
-        pass
+        print('num_params:', num_params)
+        print(flush=True)
+
+        # ====================
+        # OPTIMIZER
+        # ====================
+        parameters = filter(lambda x: x.requires_grad, self.model.parameters())
+        optimizer = optim.Adam(parameters, lr=LR)
+        print(optimizer)
 
 
 def main():
+    random.seed(RANDOM_SEED)
+
     """ Main function """
     game = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
     game.setup()

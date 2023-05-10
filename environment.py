@@ -16,16 +16,15 @@ MAP_ID = 0
 ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
 
-UPDATE_FREQUENCY = 0.1
-
 PLAYER = 1
 ENEMY = 2
 OBSTACLE = 3
+ENEMY_FOCUSED = 10
 
 
 class Environment:
 
-    def __init__(self, window_width, window_height, update_freq=UPDATE_FREQUENCY):
+    def __init__(self, window_width, window_height, update_freq=1):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
@@ -43,6 +42,12 @@ class Environment:
         self.enemies = None
         self.generate_world()
 
+        self.damage_text = arcade.Text("",
+                                       start_x=self.window_width / 15,
+                                       start_y=self.window_height - (self.window_height / 10),
+                                       color=arcade.color.AERO_BLUE,
+                                       font_size=15)
+
     def generate_world(self):
         # Spawns in the player at the center grid
         self.player = Player((round(self.grids_x / 2),
@@ -55,7 +60,7 @@ class Environment:
             obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
             self.obstacles.append(obstacle_sprite)
 
-        # Gets an obstacle list and exclude enemy spawnpoints from these locations
+        # TODO: Gets an obstacle list and exclude enemy spawnpoints from these locations
 
         # Sets up a list to spawn enemies
         # Enemies will be spawned along the borders of the map
@@ -70,13 +75,16 @@ class Environment:
         self.enemies = arcade.SpriteList()
         for i in range(ENEMY_COUNT):
             # Pick a spawn location for the enemy
-            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq)
+            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
             self.enemies.append(enemy_sprite)
 
         # Updates grid knowledge
         self.grid = self.get_map()
         for enemy in self.enemies:
             enemy.update_grid(self.grid)
+
+        # Sets up a player damage text
+        # self.damage_text =
 
     def draw(self):
         self.player.draw()
@@ -85,13 +93,24 @@ class Environment:
         for enemy in self.enemies:
             enemy.draw()
 
+        # Draw player damage received
+        self.damage_text.text = "Damage: " + str(self.player.damage_received)
+        self.damage_text.draw()
+
         if self.show_grid:
             self.draw_grid()
 
-    def update(self, delta_time):
+    def update(self, delta_time, action_list):
         # Updates the player and enemies
         self.player.update()
-        self.enemies.on_update(delta_time)
+
+        # Updates enemy grid knowledge
+        self.grid = self.get_map()
+        for enemy in self.enemies:
+            enemy.update_grid(self.grid)
+
+        for i, enemy in enumerate(self.enemies):
+            enemy.update_with_action(action_list[i])
 
         # Updates the game map
         self.grid = self.get_map()
@@ -115,6 +134,20 @@ class Environment:
             grid[y][x] = ENEMY
 
         return grid
+
+    def get_state_maps(self):
+        state_maps = list()
+        for enemy in self.enemies:
+            state_map = self.grid.copy()
+            x, y = get_grid_pos(enemy)
+            state_map[y][x] = ENEMY_FOCUSED
+
+            # Adds one channel dimension to the state map
+            state_map = np.expand_dims(state_map, axis=0)
+
+            state_maps.append(state_map)
+
+        return state_maps
 
     def get_entity_list(self):
         pass
