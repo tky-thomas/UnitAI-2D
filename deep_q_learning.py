@@ -4,10 +4,12 @@ import random
 
 
 class DeepQNetwork_FullMap(nn.Module):
-    def __init__(self, num_actions=5, random_action_chance=0.3, random_decay_steps=1000):
+    def __init__(self, num_actions=5, random_action_chance=0.3, random_decay_rate=0.9):
         super().__init__()
         self.num_actions = num_actions
-        self.random_chance =
+        self.random_action_chance = random_action_chance
+        self.random_decay_rate = random_decay_rate
+        self.steps = 0
 
         C1, C2, C3 = 3, 7, 14
         self.cnn_model = nn.Sequential(
@@ -34,9 +36,12 @@ class DeepQNetwork_FullMap(nn.Module):
         Random chance of exploring a random move.
         """
         action = torch.argmax(x)
-        if random.random() < RANDOM_ACTION_CHANCE:
+        if random.random() < self.random_action_chance:
             action = random.randint(0, self.num_actions - 1)
         return action
+
+    def random_decay_step(self):
+        self.random_action_chance = self.random_action_chance * self.random_decay_rate
 
 
 class CNNReceptiveChunk(nn.Module):
