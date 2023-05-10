@@ -153,7 +153,6 @@ class Enemy(arcade.Sprite):
             target_pos = (-1, -1)  # Not movable, signifies the enemy should do nothing
 
         if self.movable(target_pos):
-            print("Moving")
             self.center_x = ((target_pos[0] * self.grid_width) + self.grid_width / 2)
             self.center_y = ((target_pos[1] * self.grid_width) + self.grid_width / 2)
         else:
