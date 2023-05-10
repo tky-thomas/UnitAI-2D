@@ -42,11 +42,9 @@ class Environment:
         self.enemies = None
         self.generate_world()
 
-        self.damage_text = arcade.Text("",
-                                       start_x=self.window_width / 15,
-                                       start_y=self.window_height - (self.window_height / 10),
-                                       color=arcade.color.AERO_BLUE,
-                                       font_size=15)
+        self.damage_text = None
+
+        self.previous_player_damage = None
 
     def generate_world(self):
         # Spawns in the player at the center grid
@@ -84,7 +82,14 @@ class Environment:
             enemy.update_grid(self.grid)
 
         # Sets up a player damage text
-        # self.damage_text =
+        self.damage_text = arcade.Text("",
+                                       start_x=self.window_width / 15,
+                                       start_y=self.window_height - (self.window_height / 10),
+                                       color=arcade.color.AERO_BLUE,
+                                       font_size=15)
+
+        # Player damage tracker for reward calculation
+        self.previous_player_damage = self.player.damage_received
 
     def draw(self):
         self.player.draw()
@@ -112,8 +117,14 @@ class Environment:
         for i, enemy in enumerate(self.enemies):
             enemy.update_with_action(action_list[i])
 
-        # Updates the game map
+        # Calculates the reward for this round
+        reward = self.calculate_reward()
+
+        # Updates the game map and player damage
         self.grid = self.get_map()
+        self.previous_player_damage = self.player.damage_received
+
+        return reward
 
     def get_map(self):
         # Start with an empty grid
@@ -176,6 +187,10 @@ class Environment:
         elif key == arcade.key.P:
             for enemy in self.enemies:
                 enemy.toggle_path_draw()
+
+    def calculate_reward(self):
+        damage_this_update = self.player.damage_received - self.previous_player_damage
+        return damage_this_update
 
 
 def get_grid_pos(sprite: arcade.Sprite):

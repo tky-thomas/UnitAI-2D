@@ -15,6 +15,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from deep_q_learning import DeepQNetwork_FullMap
+from replay_memory import DeepQReplay
 
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
@@ -26,6 +27,7 @@ UPDATE_FREQUENCY = 1
 LR = 0.01
 EPSILON = 0.3
 EPSILON_DECAY_RATE = 0.9
+MEMORY_CAPACITY = 1000
 
 # Random Seed
 RANDOM_SEED = None
@@ -45,6 +47,7 @@ class UnitAI2D(arcade.Window):
         self.model = None
         self.device = None
         self.optimizer = None
+        self.memory = None
 
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
@@ -82,7 +85,11 @@ class UnitAI2D(arcade.Window):
             action_list.append(self.model.action_translate(action_tensor))
 
         # Action is fed back into the network
-        self.environment.update(delta_time, action_list)
+        reward = self.environment.update(delta_time, action_list)
+
+        # Saves the state, action, reward and next state
+        for state_map in state_maps:
+            self.memory.push()
 
     def on_key_press(self, key, key_modifiers):
 
@@ -90,6 +97,11 @@ class UnitAI2D(arcade.Window):
         self.environment.toggle_visual(key)
 
     def machine_learning_setup(self):
+        # ====================
+        # REPLAY MEMORY (DATASET)
+        # ====================
+        self.memory = DeepQReplay(capacity=MEMORY_CAPACITY)
+
         # ====================
         # MODEL
         # ====================
