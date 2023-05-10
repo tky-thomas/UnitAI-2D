@@ -104,9 +104,13 @@ class Environment:
         # Updates the player and enemies
         self.player.update()
 
-        # Updates each enemy with an action
+        # Updates enemy grid knowledge
+        self.grid = self.get_map()
+        for enemy in self.enemies:
+            enemy.update_grid(self.grid)
+
         for i, enemy in enumerate(self.enemies):
-            enemy.update_with_action(action_list[i], delta_time)
+            enemy.update_with_action(action_list[i])
 
         # Updates the game map
         self.grid = self.get_map()

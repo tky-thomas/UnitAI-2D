@@ -9,6 +9,11 @@ ENEMY = 2
 OBSTACLE = 3
 UNIT_MARKER = 5
 
+UP = 1
+RIGHT = 2
+DOWN = 3
+LEFT = 4
+
 PATHFIND_CYCLES = 3
 
 class Player(arcade.Sprite):
@@ -105,7 +110,7 @@ class Enemy(arcade.Sprite):
                                           radius=3,
                                           color=arcade.color.AERO_BLUE)
 
-    def update_with_action(self, action, delta_time: float = 1 / 60):
+    def update(self, delta_time: float = 1 / 60):
         # Update timer
         self.update_timer += delta_time
         if self.update_timer < self.update_freq:
@@ -128,6 +133,31 @@ class Enemy(arcade.Sprite):
             self.center_y = ((move_pos[1] * self.grid_width) + self.grid_width / 2)
             self.path.remove(self.path[0])
         else:
+            if self.player_in_range():
+                # Deal damage to the player
+                self.player.damage(1)
+
+    def update_with_action(self, action):
+
+        # Move to the specified location by the action
+        self_pos = self.get_self_pos()
+        if action == UP:
+            target_pos = (self_pos[0], self_pos[1] + 1)
+        elif action == DOWN:
+            target_pos = (self_pos[0], self_pos[1] - 1)
+        elif action == RIGHT:
+            target_pos = (self_pos[0] + 1, self_pos[1])
+        elif action == LEFT:
+            target_pos = (self_pos[0] - 1, self_pos[1])
+        else:
+            target_pos = (-1, -1)  # Not movable, signifies the enemy should do nothing
+
+        if self.movable(target_pos):
+            print("Moving")
+            self.center_x = ((target_pos[0] * self.grid_width) + self.grid_width / 2)
+            self.center_y = ((target_pos[1] * self.grid_width) + self.grid_width / 2)
+        else:
+            # TODO: LINE OF SIGHT
             if self.player_in_range():
                 # Deal damage to the player
                 self.player.damage(1)
@@ -163,3 +193,16 @@ class Enemy(arcade.Sprite):
         target_pos = np.where(self.grid == PLAYER)
         target_pos = (target_pos[1], target_pos[0])
         return target_pos
+
+    def movable(self, target_pos):
+        # Checks whether a particular grid square is a legal move
+        if target_pos[1] >= len(self.grid) or target_pos[1] < 0:
+            return False
+        if target_pos[0] >= len(self.grid[0]) or target_pos[0] < 0:
+            return False
+
+        grid_object = self.grid[target_pos[1]][target_pos[0]]
+        if grid_object == OBSTACLE or grid_object == PLAYER:
+            return False
+
+        return True
