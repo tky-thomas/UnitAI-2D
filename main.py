@@ -25,7 +25,7 @@ from replay_memory import DeepQReplay, StateTransition
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
-GRAPHICS_MODE = "no-display"
+GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
 
 UPDATE_FREQUENCY = 0.1
 
@@ -44,13 +44,14 @@ RANDOM_SEED = None
 
 
 class UnitAI2D:
-    def __init__(self, width, height, cycles=300, training_batch_size=32, gamma=0.99):
+    def __init__(self, width, height, cycles=300, training_batch_size=32, gamma=0.99, graphics_enabled=False):
         self.environment = None
         self.update_timer = None
         self.cycle_timer = None
         self.update_freq = None
         self.width = width
         self.height = height
+        self.graphics_enabled = graphics_enabled
 
         # Deep learning model setup
         self.policy_model = None
@@ -65,11 +66,10 @@ class UnitAI2D:
         self.machine_learning_setup()
 
     def setup(self):
-        """ Set up the game variables. Call to re-start the game. """
         self.update_timer = 0
         self.cycle_timer = 0
         self.update_freq = UPDATE_FREQUENCY
-        self.environment = Environment(self.width, self.height, self.update_freq)
+        self.environment = Environment(self.width, self.height, self.update_freq, self.graphics_enabled)
 
     def on_update(self, delta_time):
         # Update timer
@@ -219,12 +219,12 @@ class UnitAI2D:
 
 
 class UnitAI2D_Window(arcade.Window):
-
     def __init__(self, title, ai2d):
         super().__init__(ai2d.width, ai2d.height, title)
         arcade.set_background_color(arcade.color.AMAZON)
 
         self.ai2d = ai2d
+        self.ai2d.graphics_enabled=True
 
     def setup(self):
         self.ai2d.setup()
@@ -253,6 +253,7 @@ def main():
     # If the display is enabled, arcade will run the game.
     # Otherwise, the update cycle will run without a window and draw
     if GRAPHICS_MODE == "display":
+
         game = UnitAI2D_Window(WINDOW_TITLE, ai2d)
         game.setup()
         arcade.run()
