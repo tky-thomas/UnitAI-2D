@@ -38,6 +38,7 @@ class DeepQNetwork_FullMap(nn.Module):
         action = torch.argmax(x)
         if random.random() < self.random_action_chance:
             action = random.randint(0, self.num_actions - 1)
+            action = torch.tensor(action)
         return action
 
     def random_decay_step(self):

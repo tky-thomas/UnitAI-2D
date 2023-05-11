@@ -189,8 +189,13 @@ class Environment:
                 enemy.toggle_path_draw()
 
     def calculate_reward(self):
-        damage_this_update = self.player.damage_received - self.previous_player_damage
-        return damage_this_update
+        # Gives one point of reward for every point of damage inflicted on the player
+        reward = self.player.damage_received - self.previous_player_damage
+
+        # Gives a small reward for being close to the player
+        for enemy in self.enemies:
+            reward += (1 / enemy.get_distance_from_player())
+        return reward
 
 
 def get_grid_pos(sprite: arcade.Sprite):
