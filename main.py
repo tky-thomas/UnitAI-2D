@@ -7,9 +7,13 @@ template.
 If Python and Arcade are installed, this example can be run from the command line with:
 python -m arcade.examples.starting_template
 """
+import math
+
 import arcade
 from environment import Environment
 import random
+import time
+import sys
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -39,16 +43,14 @@ TAU = 0.05  # Rate at which target network is updated
 RANDOM_SEED = None
 
 
-class UnitAI2D(arcade.Window):
-
-    def __init__(self, width, height, title, cycles=300, training_batch_size=32, gamma=0.99):
-        super().__init__(width, height, title)
-        arcade.set_background_color(arcade.color.AMAZON)
-
+class UnitAI2D:
+    def __init__(self, width, height, cycles=300, training_batch_size=32, gamma=0.99):
         self.environment = None
         self.update_timer = None
         self.cycle_timer = None
         self.update_freq = None
+        self.width = width
+        self.height = height
 
         # Deep learning model setup
         self.policy_model = None
@@ -56,9 +58,9 @@ class UnitAI2D(arcade.Window):
         self.device = None
         self.optimizer = None
         self.memory = None
+
         self.training_batch_size = training_batch_size
         self.gamma = gamma
-
         self.episode_cycles = cycles
         self.machine_learning_setup()
 
@@ -68,13 +70,6 @@ class UnitAI2D(arcade.Window):
         self.cycle_timer = 0
         self.update_freq = UPDATE_FREQUENCY
         self.environment = Environment(self.width, self.height, self.update_freq)
-
-    def on_draw(self):
-        """
-        Render the screen.
-        """
-        self.clear()
-        self.environment.draw()
 
     def on_update(self, delta_time):
         # Update timer
@@ -89,6 +84,17 @@ class UnitAI2D(arcade.Window):
         if self.cycle_timer > self.episode_cycles:
             self.train_network()
             self.setup()
+        # Draw a progress bar
+        i_bars = math.floor(self.cycle_timer * 20 / self.episode_cycles)
+        sys.stdout.write('\r')
+        # Progress Bar
+        sys.stdout.write("Episode Progress: [%-20s] %d%%    %d | %d    "
+                         % ('=' * i_bars,
+                            round(self.cycle_timer * 100 / self.episode_cycles),
+                            self.cycle_timer,
+                            self.episode_cycles))
+        sys.stdout.flush()
+        time.sleep(0.001)
 
         # Model returns information about all units
         state_maps = self.environment.get_state_maps()
@@ -113,15 +119,10 @@ class UnitAI2D(arcade.Window):
         for i in range(10):
             state_idx = random.randint(0, len(state_maps) - 1)
             state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
-            action_t = action_list[state_idx].reshape(1,)
+            action_t = action_list[state_idx].reshape(1, )
             next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
             reward_t = torch.tensor([reward], dtype=torch.float32, device=self.device)
             self.memory.push(state_t, action_t, reward_t, next_state_t)
-
-    def on_key_press(self, key, key_modifiers):
-
-        # Toggles the grid
-        self.environment.toggle_visual(key)
 
     def machine_learning_setup(self):
         # ====================
@@ -199,8 +200,6 @@ class UnitAI2D(arcade.Window):
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
-        print(state_action_values.size())
-
         # Compute Huber loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
@@ -219,13 +218,52 @@ class UnitAI2D(arcade.Window):
         self.target_model.load_state_dict(target_model_state_dict)
 
 
+class UnitAI2D_Window(arcade.Window):
+
+    def __init__(self, title, ai2d):
+        super().__init__(ai2d.width, ai2d.height, title)
+        arcade.set_background_color(arcade.color.AMAZON)
+
+        self.ai2d = ai2d
+
+    def setup(self):
+        self.ai2d.setup()
+
+    def on_draw(self):
+        """
+        Render the screen.
+        """
+        self.clear()
+        self.ai2d.environment.draw()
+
+    def on_update(self, delta_time):
+        self.ai2d.on_update(delta_time)
+
+    def on_key_press(self, key, key_modifiers):
+
+        # Toggles the grid
+        self.ai2d.environment.toggle_visual(key)
+
+
 def main():
     random.seed(RANDOM_SEED)
 
-    """ Main function """
-    game = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, EPISODE_CYCLES, BATCH_SIZE, GAMMA)
-    game.setup()
-    arcade.run()
+    ai2d = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT, EPISODE_CYCLES, BATCH_SIZE, GAMMA)
+
+    # If the display is enabled, arcade will run the game.
+    # Otherwise, the update cycle will run without a window and draw
+    if GRAPHICS_MODE == "display":
+        game = UnitAI2D_Window(WINDOW_TITLE, ai2d)
+        game.setup()
+        arcade.run()
+    else:
+        ai2d.setup()
+        prev_time = time.time()
+        while True:
+            current_time = time.time()
+            delta_time = current_time - prev_time
+            ai2d.on_update(delta_time)
+            prev_time = current_time
 
 
 if __name__ == "__main__":

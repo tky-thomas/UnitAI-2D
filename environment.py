@@ -24,10 +24,11 @@ ENEMY_FOCUSED = 10
 
 class Environment:
 
-    def __init__(self, window_width, window_height, update_freq=1):
+    def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
+        self.graphics_enabled = graphics_enabled
 
         # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
@@ -81,12 +82,13 @@ class Environment:
         for enemy in self.enemies:
             enemy.update_grid(self.grid)
 
-        # Sets up a player damage text
-        self.damage_text = arcade.Text("",
-                                       start_x=self.window_width / 15,
-                                       start_y=self.window_height - (self.window_height / 10),
-                                       color=arcade.color.AERO_BLUE,
-                                       font_size=15)
+        # Sets up a player damage text if graphics is enabled
+        if self.graphics_enabled:
+            self.damage_text = arcade.Text("",
+                                           start_x=self.window_width / 15,
+                                           start_y=self.window_height - (self.window_height / 10),
+                                           color=arcade.color.AERO_BLUE,
+                                           font_size=15)
 
         # Player damage tracker for reward calculation
         self.previous_player_damage = self.player.damage_received
