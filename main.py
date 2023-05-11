@@ -78,8 +78,7 @@ class UnitAI2D(arcade.Window):
         action_list = list()
         for state_map in state_maps:
             # Convert each state map into a tensor
-            state_map = torch.Tensor(state_map)
-            state_map = state_map.unsqueeze(0)
+            state_map = torch.Tensor(state_map).unsqueeze(0)
 
             action_tensor = self.model(state_map)
             action_list.append(self.model.action_translate(action_tensor))
@@ -87,9 +86,12 @@ class UnitAI2D(arcade.Window):
         # Action is fed back into the network
         reward = self.environment.update(delta_time, action_list)
 
-        # Saves the state, action, reward and next state
+        # Gets the next state information from the network
+        next_state_maps = self.environment.get_state_maps()
+
+        # Saves the state, action, reward and next state for training.
         for state_map in state_maps:
-            self.memory.push()
+            self.memory.push(state_maps, action_list, reward, next_state_maps)
 
     def on_key_press(self, key, key_modifiers):
 

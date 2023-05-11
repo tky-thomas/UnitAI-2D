@@ -40,11 +40,11 @@ class Environment:
         self.player = None
         self.obstacles = None
         self.enemies = None
-        self.generate_world()
 
         self.damage_text = None
-
         self.previous_player_damage = None
+
+        self.generate_world()
 
     def generate_world(self):
         # Spawns in the player at the center grid
