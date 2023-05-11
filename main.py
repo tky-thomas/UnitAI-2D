@@ -21,6 +21,7 @@ from replay_memory import DeepQReplay, StateTransition
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
+GRAPHICS_MODE = "no-display"
 
 UPDATE_FREQUENCY = 0.1
 
@@ -31,7 +32,8 @@ EPSILON = 0.9
 EPSILON_DECAY_RATE = 0.9
 MEMORY_CAPACITY = 1000
 BATCH_SIZE = 32
-GAMMA = 0.99
+GAMMA = 0.99  # Coefficient of future action value
+TAU = 0.05  # Rate at which target network is updated
 
 # Random Seed
 RANDOM_SEED = None
@@ -197,6 +199,8 @@ class UnitAI2D(arcade.Window):
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
+        print(state_action_values.size())
+
         # Compute Huber loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
@@ -206,6 +210,13 @@ class UnitAI2D(arcade.Window):
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.policy_model.parameters(), 100)
         self.optimizer.step()
+
+        # Updates the target to better match policy
+        target_model_state_dict = self.target_model.state_dict()
+        policy_model_state_dict = self.policy_model.state_dict()
+        for key in policy_model_state_dict:
+            target_model_state_dict[key] = policy_model_state_dict[key] * TAU + target_model_state_dict[key] * (1 - TAU)
+        self.target_model.load_state_dict(target_model_state_dict)
 
 
 def main():
