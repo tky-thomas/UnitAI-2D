@@ -24,6 +24,7 @@ WINDOW_TITLE = "UnitAI2D"
 UPDATE_FREQUENCY = 1
 
 # Machine learning hyperparameters
+EPISODE_CYCLES = 300
 LR = 0.01
 EPSILON = 0.3
 EPSILON_DECAY_RATE = 0.9
@@ -35,27 +36,30 @@ RANDOM_SEED = None
 
 class UnitAI2D(arcade.Window):
 
-    def __init__(self, width, height, title):
+    def __init__(self, width, height, title, cycles=300):
         super().__init__(width, height, title)
         arcade.set_background_color(arcade.color.AMAZON)
 
         self.environment = None
         self.update_timer = None
+        self.cycle_timer = None
         self.update_freq = None
 
-        # Deep Q Learning model
+        # Deep learning model setup
         self.model = None
         self.device = None
         self.optimizer = None
         self.memory = None
 
+        self.episode_cycles = cycles
+        self.machine_learning_setup()
+
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
         self.update_timer = 0
+        self.cycle_timer = 0
         self.update_freq = UPDATE_FREQUENCY
         self.environment = Environment(self.width, self.height, self.update_freq)
-
-        self.machine_learning_setup()
 
     def on_draw(self):
         """
@@ -70,6 +74,13 @@ class UnitAI2D(arcade.Window):
         if self.update_timer < self.update_freq:
             return
         self.update_timer = 0
+
+        # Cycle counter. If the number of cycles exceeds a certain number,
+        # then initiate network training and reset the game environment
+        self.cycle_timer += 1
+        if self.cycle_timer > self.episode_cycles:
+            # Network training
+            self.setup()
 
         # Model returns information about all units
         state_maps = self.environment.get_state_maps()
@@ -134,12 +145,19 @@ class UnitAI2D(arcade.Window):
         optimizer = optim.Adam(parameters, lr=LR)
         print(optimizer)
 
+        # ====================
+        # MODEL SAVING
+        # ====================
+
+    def train_network(self):
+        pass
+
 
 def main():
     random.seed(RANDOM_SEED)
 
     """ Main function """
-    game = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
+    game = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, EPISODE_CYCLES)
     game.setup()
     arcade.run()
 
