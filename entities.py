@@ -21,6 +21,7 @@ ATTACK_RANGE = 6
 PLAYER_RANGE = 6
 PLAYER_AOE = 0
 
+
 class Player(arcade.Sprite):
 
     def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1, range=PLAYER_RANGE, aoe_range=PLAYER_AOE):
@@ -183,7 +184,6 @@ class Enemy(arcade.Sprite):
                 self.player.damage(1)
                 self.damage_dealt += 1
 
-
     def update_with_action(self, action):
 
         # Move to the specified location by the action
@@ -226,11 +226,14 @@ class Enemy(arcade.Sprite):
         self.draw_path = not self.draw_path
 
     def player_in_range(self):
-        target_pos = self.get_player_pos()
-        self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
-        if get_distance(target_pos, self_pos) <= self.range:
+        if self.get_distance_from_player() <= self.range:
             return True
         return False
+
+    def get_distance_from_player(self):
+        target_pos = self.get_player_pos()
+        self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        return get_distance(target_pos, self_pos)
 
     def get_player_pos(self):
         target_pos = np.where(self.grid == PLAYER)

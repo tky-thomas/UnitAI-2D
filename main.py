@@ -34,11 +34,10 @@ EPSILON_DECAY_RATE = NUM_EPISODES / 2
 MEMORY_CAPACITY = 2000
 BATCH_SIZE = 256
 GAMMA = 0.99  # Coefficient of future action value
-TAU = 0.05  # Rate at which target network is updated
+TAU = 0.2  # Rate at which target network is updated
 
 # Scenario Update
-PLAYER_RETALIATION = True
-
+ENABLE_PLAYER = False
 
 # Files
 POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy.pt"
@@ -59,7 +58,8 @@ class UnitAI2D:
                  num_episodes=100, episode_cycles=200,
                  load_model=False, save_model=False,
                  policy_model_load_path=None, policy_model_save_path=None,
-                 target_model_load_path=None, target_model_save_path=None):
+                 target_model_load_path=None, target_model_save_path=None,
+                 enable_player=False):
         self.environment = None
         self.update_timer = None
         self.cycle_timer = None
@@ -92,13 +92,15 @@ class UnitAI2D:
         self.gamma = gamma
         self.episode_cycles = episode_cycles
         self.num_episodes = num_episodes
+        self.enable_player = enable_player
         self.machine_learning_setup()
 
     def setup(self):
         self.update_timer = 0
         self.cycle_timer = 0
         self.update_freq = UPDATE_FREQUENCY
-        self.environment = Environment(self.width, self.height, self.update_freq, self.graphics_enabled)
+        self.environment = \
+            Environment(self.width, self.height, self.update_freq, self.graphics_enabled, self.enable_player)
 
     def on_update(self, delta_time):
         # Update timer
@@ -311,7 +313,8 @@ def main(graphics_mode=GRAPHICS_MODE):
                     policy_model_load_path=POLICY_MODEL_LOAD_PATH,
                     policy_model_save_path=POLICY_MODEL_SAVE_PATH,
                     target_model_load_path=TARGET_MODEL_LOAD_PATH,
-                    target_model_save_path=TARGET_MODEL_SAVE_PATH)
+                    target_model_save_path=TARGET_MODEL_SAVE_PATH,
+                    enable_player=ENABLE_PLAYER)
 
     # If the display is enabled, arcade will run the game.
     # Otherwise, the update cycle will run without a window and draw

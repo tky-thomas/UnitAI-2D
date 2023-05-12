@@ -24,12 +24,12 @@ ENEMY_FOCUSED = 10
 class Environment:
 
     def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False,
-                 player_attack=False):
+                 player_enabled=False):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
         self.graphics_enabled = graphics_enabled
-        self.player_attack=player_attack
+        self.player_enabled = player_enabled
 
         # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
@@ -123,8 +123,8 @@ class Environment:
         # The player now attacks, removing a random enemy in range.
         # He will pick an enemy close to his previous target, with a random chance of switching targets.
         # This attack may have an AOE.
-        if self.player_attack:
-            self.player.update(self.enemies)
+        if self.player_enabled:
+            self.player.update_player(self.enemies)
 
         # Respawn dead enemies
         self.spawn_enemies(ENEMY_COUNT - len(self.enemies))
