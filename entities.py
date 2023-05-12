@@ -15,6 +15,7 @@ DOWN = 3
 LEFT = 4
 
 PATHFIND_CYCLES = 3
+ATTACK_RANGE = 6
 
 class Player(arcade.Sprite):
 
@@ -63,7 +64,7 @@ class Obstacle(arcade.Sprite):
 
 class Enemy(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, attack_range=2, grid_width=20, update_freq=1, player=None):
+    def __init__(self, spawn_pos_grid, attack_range=ATTACK_RANGE, grid_width=20, update_freq=1, player=None):
         super().__init__()
         self.pos = spawn_pos_grid
         self.update_freq = update_freq
@@ -179,11 +180,14 @@ class Enemy(arcade.Sprite):
         self.draw_path = not self.draw_path
 
     def player_in_range(self):
-        target_pos = self.get_player_pos()
-        self_pos = self.get_self_pos()
-        if math.sqrt(pow(target_pos[0] - self_pos[0], 2) + pow(target_pos[1] - self_pos[1], 2)) <= self.range:
+        if self.get_distance_from_player() <= self.range:
             return True
         return False
+
+    def get_distance_from_player(self):
+        target_pos = self.get_player_pos()
+        self_pos = self.get_self_pos()
+        return math.sqrt(pow(target_pos[0] - self_pos[0], 2) + pow(target_pos[1] - self_pos[1], 2))
 
     def get_self_pos(self):
         return math.floor(self.center_x / self.grid_width), math.floor(self.center_y / self.grid_width)

@@ -24,10 +24,11 @@ ENEMY_FOCUSED = 10
 
 class Environment:
 
-    def __init__(self, window_width, window_height, update_freq=1):
+    def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
+        self.graphics_enabled = graphics_enabled
 
         # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
@@ -40,13 +41,11 @@ class Environment:
         self.player = None
         self.obstacles = None
         self.enemies = None
-        self.generate_world()
 
-        self.damage_text = arcade.Text("",
-                                       start_x=self.window_width / 15,
-                                       start_y=self.window_height - (self.window_height / 10),
-                                       color=arcade.color.AERO_BLUE,
-                                       font_size=15)
+        self.damage_text = None
+        self.previous_player_damage = None
+
+        self.generate_world()
 
     def generate_world(self):
         # Spawns in the player at the center grid
@@ -83,8 +82,16 @@ class Environment:
         for enemy in self.enemies:
             enemy.update_grid(self.grid)
 
-        # Sets up a player damage text
-        # self.damage_text =
+        # Sets up a player damage text if graphics is enabled
+        if self.graphics_enabled:
+            self.damage_text = arcade.Text("",
+                                           start_x=self.window_width / 15,
+                                           start_y=self.window_height - (self.window_height / 10),
+                                           color=arcade.color.AERO_BLUE,
+                                           font_size=15)
+
+        # Player damage tracker for reward calculation
+        self.previous_player_damage = self.player.damage_received
 
     def draw(self):
         self.player.draw()
@@ -112,8 +119,14 @@ class Environment:
         for i, enemy in enumerate(self.enemies):
             enemy.update_with_action(action_list[i])
 
-        # Updates the game map
+        # Calculates the reward for this round
+        reward = self.calculate_reward()
+
+        # Updates the game map and player damage
         self.grid = self.get_map()
+        self.previous_player_damage = self.player.damage_received
+
+        return reward
 
     def get_map(self):
         # Start with an empty grid
@@ -176,6 +189,15 @@ class Environment:
         elif key == arcade.key.P:
             for enemy in self.enemies:
                 enemy.toggle_path_draw()
+
+    def calculate_reward(self):
+        # Gives one point of reward for every point of damage inflicted on the player
+        reward = self.player.damage_received - self.previous_player_damage
+
+        # Gives a small reward for being close to the player
+        for enemy in self.enemies:
+            reward += (1 / enemy.get_distance_from_player())
+        return reward
 
 
 def get_grid_pos(sprite: arcade.Sprite):
