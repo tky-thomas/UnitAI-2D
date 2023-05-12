@@ -18,13 +18,13 @@ from replay_memory import DeepQReplay, StateTransition
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
-GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
+GRAPHICS_MODE = "no-display"  # OPTIONS: display, no-display
 
 UPDATE_FREQUENCY = 0.05
 
 # Machine learning hyperparameters
-NUM_EPISODES = 2
-EPISODE_CYCLES = 50
+NUM_EPISODES = 100
+EPISODE_CYCLES = 300
 LR = 0.01
 EPSILON = 0.9
 EPSILON_DECAY_RATE = 0.9
@@ -32,6 +32,10 @@ MEMORY_CAPACITY = 2000
 BATCH_SIZE = 32
 GAMMA = 0.99  # Coefficient of future action value
 TAU = 0.05  # Rate at which target network is updated
+
+# Scenario Update
+PLAYER_RETALIATION = True
+
 
 # Files
 POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy.pt"
@@ -210,8 +214,6 @@ class UnitAI2D:
         training_batch = self.memory.sample(BATCH_SIZE)
         batch = StateTransition(*zip(*training_batch))
 
-        # Technically there will always be a next state in this infinite simulation,
-        # so finding a non-final mask is not needed
         state_batch = torch.stack(batch.state)
         action_batch = torch.stack(batch.action)
         reward_batch = torch.stack(batch.reward)
@@ -226,19 +228,12 @@ class UnitAI2D:
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
-
-        # Compute V(s_{t+1}) for all next states.
-        # Expected values of actions for non_final_next_states are computed based
-        # on the "older" target_net; selecting their best reward with max(1)[0].
-        # This is merged based on the mask, such that we'll have either the expected
-        # state value or 0 in case the state was final.
-        next_state_values = torch.zeros(self.training_batch_size, device=self.device)
         with torch.no_grad():
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
-        # Compute Huber loss
+        # Huber Loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values)
 
@@ -254,6 +249,9 @@ class UnitAI2D:
         for key in policy_model_state_dict:
             target_model_state_dict[key] = policy_model_state_dict[key] * TAU + target_model_state_dict[key] * (1 - TAU)
         self.target_model.load_state_dict(target_model_state_dict)
+        
+        # Decays the random move tendency
+        self.policy_model.random_decay_step()
 
         # Save the policy and target model
         if self.save_model:

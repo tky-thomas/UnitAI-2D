@@ -122,6 +122,10 @@ class Environment:
         # Calculates the reward for this round
         reward = self.calculate_reward()
 
+        # The player now attacks, removing a random enemy in range.
+        # He will pick an enemy close to his previous target, with a random chance of switching targets.
+        # This attack may have an AOE.
+
         # Updates the game map and player damage
         self.grid = self.get_map()
         self.previous_player_damage = self.player.damage_received
