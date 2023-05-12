@@ -6,6 +6,7 @@ from environment import Environment
 import random
 import time
 import sys
+import pickle
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -22,8 +23,8 @@ GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
 UPDATE_FREQUENCY = 0.05
 
 # Machine learning hyperparameters
-NUM_EPISODES = 100
-EPISODE_CYCLES = 300
+NUM_EPISODES = 2
+EPISODE_CYCLES = 50
 LR = 0.01
 EPSILON = 0.9
 EPSILON_DECAY_RATE = 0.9
@@ -37,8 +38,10 @@ POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy.pt"
 POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy.pt"
 TARGET_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_target.pt"
 TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target.pt"
+RESULT_SAVE_PATH = "results/120523_no_death_ranged.pt"
 LOAD_MODEL = False
 SAVE_MODEL = True
+SAVE_RESULT = True
 
 # Random Seed
 RANDOM_SEED = None
@@ -74,6 +77,10 @@ class UnitAI2D:
         self.target_model_load_path = target_model_load_path
         self.target_model_save_path = target_model_save_path
 
+        # Saving episode data
+        self.network_losses = list()
+        self.reward_history = list()
+
         self.training_batch_size = training_batch_size
         self.gamma = gamma
         self.episode_cycles = episode_cycles
@@ -96,7 +103,11 @@ class UnitAI2D:
         # Episode cycle counter. Returns True when number of episode cycles has been reached.
         self.cycle_timer += 1
         if self.cycle_timer > self.episode_cycles:
-            self.train_network()
+
+            network_loss, total_reward = self.train_network()
+            self.network_losses.append(network_loss)
+            self.reward_history.append(total_reward)
+
             self.episode_timer += 1
             if self.episode_timer > self.num_episodes:
                 return True
@@ -253,6 +264,9 @@ class UnitAI2D:
             torch.save(self.target_model.state_dict(), self.target_model_save_path)
         print()
 
+        # Return the training loss and reward achieved
+        return loss.item(), torch.sum(reward_batch).item()
+
 
 class UnitAI2D_Window(arcade.Window):
     def __init__(self, title, ai2d):
@@ -308,6 +322,16 @@ def main(graphics_mode=GRAPHICS_MODE):
             if ai2d.on_update(delta_time):
                 break
             prev_time = current_time
+
+    # Save Episode Results
+    if SAVE_RESULT:
+        if not os.path.isdir(os.path.dirname(RESULT_SAVE_PATH)):
+            os.makedirs(os.path.dirname(RESULT_SAVE_PATH))
+
+    result = {'loss': ai2d.network_losses,
+              'reward': ai2d.reward_history}
+    with open(RESULT_SAVE_PATH, 'wb') as result_file:
+        pickle.dump(result, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Training complete!")
 
