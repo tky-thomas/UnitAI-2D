@@ -17,16 +17,17 @@ from replay_memory import DeepQReplay, StateTransition
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
-GRAPHICS_MODE = "no-display"  # OPTIONS: display, no-display
+GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
 
 UPDATE_FREQUENCY = 0.05
 
 # Machine learning hyperparameters
-EPISODE_CYCLES = 100
+NUM_EPISODES = 100
+EPISODE_CYCLES = 300
 LR = 0.01
 EPSILON = 0.9
 EPSILON_DECAY_RATE = 0.9
-MEMORY_CAPACITY = 1000
+MEMORY_CAPACITY = 2000
 BATCH_SIZE = 32
 GAMMA = 0.99  # Coefficient of future action value
 TAU = 0.05  # Rate at which target network is updated
@@ -44,13 +45,15 @@ RANDOM_SEED = None
 
 
 class UnitAI2D:
-    def __init__(self, width, height, cycles=300, training_batch_size=32, gamma=0.99, graphics_enabled=False,
+    def __init__(self, width, height, training_batch_size=32, gamma=0.99, graphics_enabled=False,
+                 num_episodes=100, episode_cycles=200,
                  load_model=False, save_model=False,
                  policy_model_load_path=None, policy_model_save_path=None,
                  target_model_load_path=None, target_model_save_path=None):
         self.environment = None
         self.update_timer = None
         self.cycle_timer = None
+        self.episode_timer = 1
         self.update_freq = None
         self.width = width
         self.height = height
@@ -73,7 +76,8 @@ class UnitAI2D:
 
         self.training_batch_size = training_batch_size
         self.gamma = gamma
-        self.episode_cycles = cycles
+        self.episode_cycles = episode_cycles
+        self.num_episodes = num_episodes
         self.machine_learning_setup()
 
     def setup(self):
@@ -89,17 +93,22 @@ class UnitAI2D:
             return
         self.update_timer = 0
 
-        # Episode cycle counter
+        # Episode cycle counter. Returns True when number of episode cycles has been reached.
         self.cycle_timer += 1
         if self.cycle_timer > self.episode_cycles:
             self.train_network()
+            self.episode_timer += 1
+            if self.episode_timer > self.num_episodes:
+                return True
             self.setup()
 
         # Draw a progress bar
         i_bars = math.floor(self.cycle_timer * 20 / self.episode_cycles)
         sys.stdout.write('\r')
-        sys.stdout.write("Episode Progress: [%-20s] %d%%    %d | %d    "
-                         % ('=' * i_bars,
+        sys.stdout.write("Episode %d/%d: [%-20s] %d%%    %d | %d    "
+                         % (self.episode_timer,
+                            self.num_episodes,
+                            '=' * i_bars,
                             round(self.cycle_timer * 100 / self.episode_cycles),
                             self.cycle_timer,
                             self.episode_cycles))
@@ -131,6 +140,9 @@ class UnitAI2D:
             next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
             reward_t = torch.tensor([reward], dtype=torch.float32, device=self.device)
             self.memory.push(state_t, action_t, reward_t, next_state_t)
+
+        # Return false to continue training
+        return False
 
     def machine_learning_setup(self):
         # ====================
@@ -258,7 +270,9 @@ class UnitAI2D_Window(arcade.Window):
         self.ai2d.environment.draw()
 
     def on_update(self, delta_time):
-        self.ai2d.on_update(delta_time)
+        # Close window when simulation is complete
+        if self.ai2d.on_update(delta_time):
+            self.close()
 
     def on_key_press(self, key, key_modifiers):
 
@@ -270,7 +284,8 @@ def main(graphics_mode=GRAPHICS_MODE):
     random.seed(RANDOM_SEED)
 
     ai2d = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT,
-                    EPISODE_CYCLES, BATCH_SIZE, GAMMA,
+                    num_episodes=NUM_EPISODES, episode_cycles=EPISODE_CYCLES,
+                    training_batch_size=BATCH_SIZE, gamma=GAMMA,
                     load_model=LOAD_MODEL,
                     save_model=SAVE_MODEL,
                     policy_model_load_path=POLICY_MODEL_LOAD_PATH,
@@ -290,8 +305,11 @@ def main(graphics_mode=GRAPHICS_MODE):
         while True:
             current_time = time.time()
             delta_time = current_time - prev_time
-            ai2d.on_update(delta_time)
+            if ai2d.on_update(delta_time):
+                break
             prev_time = current_time
+
+    print("Training complete!")
 
 
 if __name__ == "__main__":
