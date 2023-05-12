@@ -5,7 +5,6 @@ and relaying this information to game objects.
 Also, responsible for generating new enemy entities as they are killed.
 """
 import arcade.sprite
-import random
 from entities import *
 
 GRID_SIZE = 20
@@ -24,11 +23,13 @@ ENEMY_FOCUSED = 10
 
 class Environment:
 
-    def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False):
+    def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False,
+                 player_attack=False):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
         self.graphics_enabled = graphics_enabled
+        self.player_attack=player_attack
 
         # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
@@ -72,10 +73,7 @@ class Environment:
 
         # Generates an initial batch of enemy units
         self.enemies = arcade.SpriteList()
-        for i in range(ENEMY_COUNT):
-            # Pick a spawn location for the enemy
-            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
-            self.enemies.append(enemy_sprite)
+        self.spawn_enemies(ENEMY_COUNT)
 
         # Updates grid knowledge
         self.grid = self.get_map()
@@ -125,6 +123,11 @@ class Environment:
         # The player now attacks, removing a random enemy in range.
         # He will pick an enemy close to his previous target, with a random chance of switching targets.
         # This attack may have an AOE.
+        if self.player_attack:
+            self.player.update(self.enemies)
+
+        # Respawn dead enemies
+        self.spawn_enemies(ENEMY_COUNT - len(self.enemies))
 
         # Updates the game map and player damage
         self.grid = self.get_map()
@@ -195,13 +198,19 @@ class Environment:
                 enemy.toggle_path_draw()
 
     def calculate_reward(self):
-        # Gives one point of reward for every point of damage inflicted on the player
-        reward = self.player.damage_received - self.previous_player_damage
+        # Gives ten points of reward for every point of damage inflicted on the player
+        reward = (self.player.damage_received - self.previous_player_damage) * 10
 
         # Gives a small reward for being close to the player
         for enemy in self.enemies:
             reward += (1 / enemy.get_distance_from_player())
         return reward
+
+    def spawn_enemies(self, enemy_count):
+        for i in range(enemy_count):
+            # Pick a spawn location for the enemy
+            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
+            self.enemies.append(enemy_sprite)
 
 
 def get_grid_pos(sprite: arcade.Sprite):

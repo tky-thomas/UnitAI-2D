@@ -26,10 +26,13 @@ UPDATE_FREQUENCY = 0.05
 NUM_EPISODES = 100
 EPISODE_CYCLES = 300
 LR = 0.01
-EPSILON = 0.9
-EPSILON_DECAY_RATE = 0.9
+
+EPSILON_START = 0.9
+EPSILON_END = 0.05
+EPSILON_DECAY_RATE = NUM_EPISODES / 2
+
 MEMORY_CAPACITY = 2000
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 GAMMA = 0.99  # Coefficient of future action value
 TAU = 0.05  # Rate at which target network is updated
 
@@ -172,8 +175,12 @@ class UnitAI2D:
             if not os.path.isdir(os.path.dirname(self.policy_model_save_path)):
                 os.makedirs(os.path.dirname(self.policy_model_save_path))
 
-        self.policy_model = DeepQNetwork_FullMap(random_action_chance=EPSILON, random_decay_rate=EPSILON_DECAY_RATE)
-        self.target_model = DeepQNetwork_FullMap(random_action_chance=EPSILON, random_decay_rate=EPSILON_DECAY_RATE)
+        self.policy_model = DeepQNetwork_FullMap(eps_start=EPSILON_START,
+                                                 eps_end=EPSILON_END,
+                                                 eps_decay=EPSILON_DECAY_RATE)
+        self.target_model = DeepQNetwork_FullMap(eps_start=EPSILON_START,
+                                                 eps_end=EPSILON_END,
+                                                 eps_decay=EPSILON_DECAY_RATE)
         self.target_model.load_state_dict(self.policy_model.state_dict())
         # Model loading
         if self.load_model:
@@ -219,16 +226,12 @@ class UnitAI2D:
         reward_batch = torch.stack(batch.reward)
         next_state_batch = torch.stack(batch.next_state)
 
-        sys.stdout.write("Total Reward: %.2f  "
-                         % (torch.sum(reward_batch).item()))
-        sys.stdout.flush()
-        time.sleep(0.001)
-
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
         with torch.no_grad():
+            # Selecting the max Q trains the policy net to approximate the max
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
@@ -236,6 +239,12 @@ class UnitAI2D:
         # Huber Loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values)
+
+        sys.stdout.write("Total Reward: %.2f  Loss: %.5f  "
+                         % (torch.sum(reward_batch).item(),
+                            loss.item()))
+        sys.stdout.flush()
+        time.sleep(0.001)
 
         # Optimize the model
         self.optimizer.zero_grad()
@@ -249,7 +258,7 @@ class UnitAI2D:
         for key in policy_model_state_dict:
             target_model_state_dict[key] = policy_model_state_dict[key] * TAU + target_model_state_dict[key] * (1 - TAU)
         self.target_model.load_state_dict(target_model_state_dict)
-        
+
         # Decays the random move tendency
         self.policy_model.random_decay_step()
 
