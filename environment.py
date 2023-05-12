@@ -5,7 +5,6 @@ and relaying this information to game objects.
 Also, responsible for generating new enemy entities as they are killed.
 """
 import arcade.sprite
-import random
 from entities import *
 
 GRID_SIZE = 20
@@ -74,10 +73,7 @@ class Environment:
 
         # Generates an initial batch of enemy units
         self.enemies = arcade.SpriteList()
-        for i in range(ENEMY_COUNT):
-            # Pick a spawn location for the enemy
-            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
-            self.enemies.append(enemy_sprite)
+        self.spawn_enemies(ENEMY_COUNT)
 
         # Updates grid knowledge
         self.grid = self.get_map()
@@ -129,6 +125,9 @@ class Environment:
         # This attack may have an AOE.
         if self.player_attack:
             self.player.update(self.enemies)
+
+        # Respawn dead enemies
+        self.spawn_enemies(ENEMY_COUNT - len(self.enemies))
 
         # Updates the game map and player damage
         self.grid = self.get_map()
@@ -206,6 +205,12 @@ class Environment:
         for enemy in self.enemies:
             reward += (1 / enemy.get_distance_from_player())
         return reward
+
+    def spawn_enemies(self, enemy_count):
+        for i in range(enemy_count):
+            # Pick a spawn location for the enemy
+            enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
+            self.enemies.append(enemy_sprite)
 
 
 def get_grid_pos(sprite: arcade.Sprite):
