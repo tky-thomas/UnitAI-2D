@@ -19,10 +19,11 @@ PATHFIND_CYCLES = 3
 ATTACK_RANGE = 6
 
 PLAYER_RANGE = 6
+PLAYER_AOE = 0
 
 class Player(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1, range=PLAYER_RANGE):
+    def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1, range=PLAYER_RANGE, aoe_range=PLAYER_AOE):
         super().__init__()
         self.pos = spawn_pos_grid
         self.update_freq = update_freq
@@ -30,6 +31,7 @@ class Player(arcade.Sprite):
         self.damage_received = 0
 
         self.range = range
+        self.aoe_range = aoe_range
         self.prev_target = None
 
         # Position the player
@@ -59,15 +61,26 @@ class Player(arcade.Sprite):
 
         # Select a target to destroy. This will be the one closest to the previous target.
         if len(viable_targets) > 0:
+            targets = list()
             if self.prev_target is None:
-                target = random.choice(viable_targets)
+                initial_target = random.choice(viable_targets)
             else:
                 viable_targets.sort(
                     key=lambda s: get_distance(self.prev_target, xy_to_pos(s.center_x, s.center_y, s.grid_width)))
-                target = viable_targets[0]
+                initial_target = viable_targets[0]
 
-            self.prev_target = xy_to_pos(target.center_x, target.center_y, target.grid_width)
-            target.damage()
+            # AOE damage
+            for enemy in enemies:
+                # Check if in range
+                enemy_pos = xy_to_pos(enemy.center_x, enemy.center_y, enemy.grid_width)
+                if get_distance(xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width),
+                                enemy_pos) <= self.aoe_range:
+                    targets.append(enemy)
+
+            self.prev_target = xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width)
+
+            for target in targets:
+                target.damage()
 
 
 class Obstacle(arcade.Sprite):
