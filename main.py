@@ -146,17 +146,16 @@ class UnitAI2D:
             action_list.append(self.policy_model.action_translate(action_tensor))
 
         # Action is fed back into the network
-        reward = self.environment.update(delta_time, action_list)
+        rewards = self.environment.update(delta_time, action_list)
         next_state_maps = self.environment.get_state_maps()
 
         # Saves the state, action, reward and next state for training.
-        # Only a few agents are randomly sampled
         for i in range(5):
             state_idx = random.randint(0, len(state_maps) - 1)
             state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
             action_t = action_list[state_idx].reshape(1, )
             next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
-            reward_t = torch.tensor([reward], dtype=torch.float32, device=self.device)
+            reward_t = torch.tensor([rewards[state_idx]], dtype=torch.float32, device=self.device)
             self.memory.push(state_t, action_t, reward_t, next_state_t)
 
         # Return false to continue training

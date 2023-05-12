@@ -116,6 +116,7 @@ class Enemy(arcade.Sprite):
         self.pathfind_cycle_threshold = PATHFIND_CYCLES
 
         self.player = player
+        self.damage_dealt = 0
 
         # Position the enemy
         self.height = grid_width
@@ -180,6 +181,8 @@ class Enemy(arcade.Sprite):
             if self.player_in_range():
                 # Deal damage to the player
                 self.player.damage(1)
+                self.damage_dealt += 1
+
 
     def update_with_action(self, action):
 

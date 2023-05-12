@@ -118,7 +118,7 @@ class Environment:
             enemy.update_with_action(action_list[i])
 
         # Calculates the reward for this round
-        reward = self.calculate_reward()
+        rewards = self.calculate_reward()
 
         # The player now attacks, removing a random enemy in range.
         # He will pick an enemy close to his previous target, with a random chance of switching targets.
@@ -133,7 +133,7 @@ class Environment:
         self.grid = self.get_map()
         self.previous_player_damage = self.player.damage_received
 
-        return reward
+        return rewards
 
     def get_map(self):
         # Start with an empty grid
@@ -198,13 +198,20 @@ class Environment:
                 enemy.toggle_path_draw()
 
     def calculate_reward(self):
-        # Gives ten points of reward for every point of damage inflicted on the player
-        reward = (self.player.damage_received - self.previous_player_damage) * 10
+        # Calculates the reward for every single enemy agent
+        rewards = list()
 
-        # Gives a small reward for being close to the player
         for enemy in self.enemies:
+            # Reward damage on player
+            reward = enemy.damage_dealt * 10
+            enemy.damage_dealt = 0
+
+            # Reward being close to player
             reward += (1 / enemy.get_distance_from_player())
-        return reward
+
+            rewards.append(reward)
+
+        return rewards
 
     def spawn_enemies(self, enemy_count):
         for i in range(enemy_count):
