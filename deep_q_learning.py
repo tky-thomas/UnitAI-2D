@@ -1,14 +1,21 @@
+import math
+
 import torch.nn as nn
 import torch
 import random
 
 
 class DeepQNetwork_FullMap(nn.Module):
-    def __init__(self, num_actions=5, random_action_chance=0.3, random_decay_rate=0.9):
+    def __init__(self, num_actions=5,
+                 eps_start=0.3,
+                 eps_end=0.05,
+                 eps_decay=0.9):
         super().__init__()
         self.num_actions = num_actions
-        self.random_action_chance = random_action_chance
-        self.random_decay_rate = random_decay_rate
+        self.eps = 0
+        self.eps_start = eps_start
+        self.eps_end = eps_end
+        self.eps_decay = eps_decay
         self.steps = 0
 
         C1, C2, C3 = 3, 7, 14
@@ -36,13 +43,14 @@ class DeepQNetwork_FullMap(nn.Module):
         Random chance of exploring a random move.
         """
         action = torch.argmax(x)
-        if random.random() < self.random_action_chance:
+        if random.random() < self.eps_start:
             action = random.randint(0, self.num_actions - 1)
             action = torch.tensor(action)
         return action
 
     def random_decay_step(self):
-        self.random_action_chance = self.random_action_chance * self.random_decay_rate
+        self.steps += 1
+        self.eps = self.eps_end + (self.eps_start * math.exp(-1 * self.steps / self.eps_decay))
 
 
 class CNNReceptiveChunk(nn.Module):

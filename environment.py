@@ -125,6 +125,7 @@ class Environment:
         # The player now attacks, removing a random enemy in range.
         # He will pick an enemy close to his previous target, with a random chance of switching targets.
         # This attack may have an AOE.
+        self.player.update(self.enemies)
 
         # Updates the game map and player damage
         self.grid = self.get_map()
@@ -195,8 +196,8 @@ class Environment:
                 enemy.toggle_path_draw()
 
     def calculate_reward(self):
-        # Gives one point of reward for every point of damage inflicted on the player
-        reward = self.player.damage_received - self.previous_player_damage
+        # Gives ten points of reward for every point of damage inflicted on the player
+        reward = (self.player.damage_received - self.previous_player_damage) * 10
 
         # Gives a small reward for being close to the player
         for enemy in self.enemies:

@@ -1,4 +1,5 @@
 import math
+import random
 
 import arcade
 import astar_pathfind as astar
@@ -17,14 +18,19 @@ LEFT = 4
 PATHFIND_CYCLES = 3
 ATTACK_RANGE = 6
 
+PLAYER_RANGE = 6
+
 class Player(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1):
+    def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1, range=PLAYER_RANGE):
         super().__init__()
         self.pos = spawn_pos_grid
         self.update_freq = update_freq
 
         self.damage_received = 0
+
+        self.range = range
+        self.prev_target = None
 
         # Position the player
         self.height = grid_width
@@ -41,6 +47,27 @@ class Player(arcade.Sprite):
 
     def damage(self, damage):
         self.damage_received += damage
+
+    def update_player(self, enemies):
+        viable_targets = list()
+        self.pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        for enemy in enemies:
+            # Check if in range
+            enemy_pos = xy_to_pos(enemy.center_x, enemy.center_y, enemy.grid_width)
+            if get_distance(self.pos, enemy_pos) <= self.range:
+                viable_targets.append(enemy)
+
+        # Select a target to destroy. This will be the one closest to the previous target.
+        if len(viable_targets) > 0:
+            if self.prev_target is None:
+                target = random.choice(viable_targets)
+            else:
+                viable_targets.sort(
+                    key=lambda s: get_distance(self.prev_target, xy_to_pos(s.center_x, s.center_y, s.grid_width)))
+                target = viable_targets[0]
+
+            self.prev_target = xy_to_pos(target.center_x, target.center_y, target.grid_width)
+            target.damage()
 
 
 class Obstacle(arcade.Sprite):
@@ -124,7 +151,10 @@ class Enemy(arcade.Sprite):
         if self.pathfind_cycles >= self.pathfind_cycle_threshold:
             self.pathfind_cycles = 0
             target_pos = self.get_player_pos()
-            self.path = astar.pathfind(self.grid, self.get_self_pos(), target_pos, obstacles=(OBSTACLE,))
+            self.path = astar.pathfind(self.grid,
+                                       xy_to_pos(self.center_x, self.center_y, self.grid_width),
+                                       target_pos,
+                                       obstacles=(OBSTACLE,))
 
         # Move along path, deleting trails
         # If not moving, enemies can damage the player if in range
@@ -141,7 +171,7 @@ class Enemy(arcade.Sprite):
     def update_with_action(self, action):
 
         # Move to the specified location by the action
-        self_pos = self.get_self_pos()
+        self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
         if action == UP:
             target_pos = (self_pos[0], self_pos[1] + 1)
         elif action == DOWN:
@@ -171,7 +201,7 @@ class Enemy(arcade.Sprite):
         Very importantly, used to feed the input of the neural net.
         :return: The environment grid, but with the personal position added in.
         """
-        pos = self.get_self_pos()
+        pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
         ret = self.grid
         ret[pos[1]][pos[0]] = UNIT_MARKER
         return ret
@@ -180,17 +210,11 @@ class Enemy(arcade.Sprite):
         self.draw_path = not self.draw_path
 
     def player_in_range(self):
-        if self.get_distance_from_player() <= self.range:
+        target_pos = self.get_player_pos()
+        self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        if get_distance(target_pos, self_pos) <= self.range:
             return True
         return False
-
-    def get_distance_from_player(self):
-        target_pos = self.get_player_pos()
-        self_pos = self.get_self_pos()
-        return math.sqrt(pow(target_pos[0] - self_pos[0], 2) + pow(target_pos[1] - self_pos[1], 2))
-
-    def get_self_pos(self):
-        return math.floor(self.center_x / self.grid_width), math.floor(self.center_y / self.grid_width)
 
     def get_player_pos(self):
         target_pos = np.where(self.grid == PLAYER)
@@ -209,3 +233,15 @@ class Enemy(arcade.Sprite):
             return False
 
         return True
+
+    def damage(self):
+        # For now everything dies in a one hit kill
+        self.remove_from_sprite_lists()
+
+
+def get_distance(pos1, pos2):
+    return math.sqrt(pow(pos1[0] - pos2[0], 2) + pow(pos1[1] - pos2[1], 2))
+
+
+def xy_to_pos(center_x, center_y, grid_width):
+    return math.floor(center_x / grid_width), math.floor(center_y / grid_width)
