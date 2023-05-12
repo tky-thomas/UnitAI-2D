@@ -25,7 +25,7 @@ UPDATE_FREQUENCY = 0.05
 # Machine learning hyperparameters
 NUM_EPISODES = 100
 EPISODE_CYCLES = 300
-LR = 0.0001
+LR = 0.01
 
 EPSILON_START = 0.9
 EPSILON_END = 0.05
@@ -34,7 +34,7 @@ EPSILON_DECAY_RATE = NUM_EPISODES / 2
 MEMORY_CAPACITY = 2000
 BATCH_SIZE = 256
 GAMMA = 0.99  # Coefficient of future action value
-TAU = 0.005  # Rate at which target network is updated
+TAU = 0.05  # Rate at which target network is updated
 
 # Scenario Update
 PLAYER_RETALIATION = True

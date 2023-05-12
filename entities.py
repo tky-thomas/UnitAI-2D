@@ -258,3 +258,41 @@ def get_distance(pos1, pos2):
 
 def xy_to_pos(center_x, center_y, grid_width):
     return math.floor(center_x / grid_width), math.floor(center_y / grid_width)
+
+
+def los_exists(pos1, pos2, grid):
+
+    # Find the leftmost position
+    left_pos = pos1
+    right_pos = pos2
+    if pos1[0] > pos2[0]:
+        left_pos = pos2
+        right_pos = pos1
+
+    x1 = left_pos[0]
+    y1 = left_pos[1]
+    x2 = right_pos[0]
+    y2 = right_pos[1]
+
+    m_new = 2 * (y2 - y1)
+    slope_error_new = m_new - (x2 - x1)
+
+    y = y1
+    for x in range(x1, x2 + 1):
+
+        print("(", x, ",", y, ")\n")
+
+        # Add slope to increment angle formed
+        slope_error_new = slope_error_new + m_new
+
+        # Slope error reached limit, time to
+        # increment y and update slope error.
+        if slope_error_new >= 0:
+            y = y + 1
+            slope_error_new = slope_error_new - 2 * (x2 - x1)
+
+    return True
+
+
+if __name__ == "__main__":
+    los_exists((8, 6), (1, 1), None)
