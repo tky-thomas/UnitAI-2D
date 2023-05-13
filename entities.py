@@ -205,7 +205,8 @@ class Enemy(arcade.Sprite):
         else:
             # TODO: LINE OF SIGHT
             if self.player_in_range():
-                # Deal damage to the player
+                # Deal damage to the player and add score
+                self.damage_dealt += 1
                 self.player.damage(1)
 
     def update_grid(self, grid: np.array):

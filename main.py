@@ -26,8 +26,8 @@ UPDATE_FREQUENCY = 0.05
 NUM_EPISODES = 100
 EPISODE_CYCLES = 300
 
-EPSILON_START = 0.0
-EPSILON_END = 0.0
+EPSILON_START = 0.9
+EPSILON_END = 0.05
 EPSILON_DECAY_RATE = NUM_EPISODES / 2
 
 MEMORY_CAPACITY = 2000
@@ -185,6 +185,9 @@ class UnitAI2D:
         self.target_model = DeepQNetwork_FullMap(eps_start=EPSILON_START,
                                                  eps_end=EPSILON_END,
                                                  eps_decay=EPSILON_DECAY_RATE)
+
+        # Weight initialization
+
         self.target_model.load_state_dict(self.policy_model.state_dict())
         # Model loading
         if self.load_model:
@@ -234,7 +237,6 @@ class UnitAI2D:
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
-        print(state_action_values)
         with torch.no_grad():
             # Selecting the max Q trains the policy net to approximate the max
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)
