@@ -156,11 +156,23 @@ class Environment:
         return grid
 
     def get_state_maps(self):
+        world_map = self.get_map()
         state_maps = list()
         for enemy in self.enemies:
-            state_map = self.grid.copy()
+            state_map = np.zeros(((enemy.range * 2) + 1, (enemy.range * 2) + 1))
             x, y = get_grid_pos(enemy)
-            state_map[y][x] = ENEMY_FOCUSED
+            start_x = x - enemy.range
+            start_y = y - enemy.range
+
+            # Generates a state map focused on the enemy unit
+            for i, _ in enumerate(state_map):  # Row
+                for j, _ in enumerate(state_map[i]):  # Column
+                    pos = (start_x + j, start_y + i)
+                    if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
+                        state_map[i][j] = -1
+                    else:
+                        state_map[i][j] = world_map[pos[1]][pos[0]]
+            state_map[enemy.range][enemy.range] = ENEMY_FOCUSED
 
             # Adds one channel dimension to the state map
             state_map = np.expand_dims(state_map, axis=0)

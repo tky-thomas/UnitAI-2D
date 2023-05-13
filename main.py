@@ -40,12 +40,15 @@ TAU = 0.2  # Rate at which target network is updated
 ENABLE_PLAYER = False
 
 # Files
-POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy_2.pt"
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy_2.pt')
 POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy_3.pt"
-TARGET_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_target_2.pt"
+TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy_2.pt')
 TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target_3.pt"
 RESULT_SAVE_PATH = "results/120523_no_death_ranged_2.pt"
-LOAD_MODEL = True
+LOAD_MODEL = False
 SAVE_MODEL = False
 SAVE_RESULT = True
 
@@ -231,7 +234,7 @@ class UnitAI2D:
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
-        print(state_action_values.item())
+        print(state_action_values)
         with torch.no_grad():
             # Selecting the max Q trains the policy net to approximate the max
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)

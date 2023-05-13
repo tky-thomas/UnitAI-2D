@@ -18,15 +18,14 @@ class DeepQNetwork_FullMap(nn.Module):
         self.eps_decay = eps_decay
         self.steps = 0
 
-        C1, C2, C3 = 3, 7, 14
+        C1, C2 = 2, 4
         self.cnn_model = nn.Sequential(
             CNNReceptiveChunk(1, C1),
-            CNNReceptiveChunk(C1, C2),
-            CNNReceptiveChunk(C2, C3)
+            CNNReceptiveChunk(C1, C2)
         )
         self.action_selector = nn.Sequential(
-            nn.Linear(210, 100),
-            nn.Linear(100, num_actions),
+            nn.Linear(36, 24),
+            nn.Linear(24, num_actions),
             nn.Softmax(dim=1)
         )
 
