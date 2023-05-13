@@ -5,7 +5,7 @@ import numpy as np
 
 def visualize(results_path):
     # Load results
-    with open('results/120523_no_death_ranged.pt', 'rb') as fp:
+    with open(results_path, 'rb') as fp:
         fp.seek(0)
         results = pickle.load(fp)
 
@@ -27,6 +27,8 @@ def visualize(results_path):
     x = np.arange(0, len(results['loss']))
     plt.plot(x, results['loss'], label="Loss")
 
+    plt.show()
+
 
 if __name__ == "__main__":
-    visualize()
+    visualize('results/120523_no_death_ranged.pt')

@@ -18,7 +18,7 @@ from replay_memory import DeepQReplay, StateTransition
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 WINDOW_TITLE = "UnitAI2D"
-GRAPHICS_MODE = "no-display"  # OPTIONS: display, no-display
+GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
 
 UPDATE_FREQUENCY = 0.05
 
@@ -26,27 +26,27 @@ UPDATE_FREQUENCY = 0.05
 NUM_EPISODES = 100
 EPISODE_CYCLES = 300
 
-EPSILON_START = 0.9
-EPSILON_END = 0.05
+EPSILON_START = 0.0
+EPSILON_END = 0.0
 EPSILON_DECAY_RATE = NUM_EPISODES / 2
 
 MEMORY_CAPACITY = 2000
-BATCH_SIZE = 256
+BATCH_SIZE = 512
 GAMMA = 0.99  # Coefficient of future action value
-LR = 0.003
+LR = 0.001
 TAU = 0.2  # Rate at which target network is updated
 
 # Scenario Update
 ENABLE_PLAYER = False
 
 # Files
-POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy.pt"
-POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy.pt"
-TARGET_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_target.pt"
-TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target.pt"
-RESULT_SAVE_PATH = "results/120523_no_death_ranged.pt"
-LOAD_MODEL = False
-SAVE_MODEL = True
+POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy_2.pt"
+POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy_3.pt"
+TARGET_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_target_2.pt"
+TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target_3.pt"
+RESULT_SAVE_PATH = "results/120523_no_death_ranged_2.pt"
+LOAD_MODEL = True
+SAVE_MODEL = False
 SAVE_RESULT = True
 
 # Random Seed
@@ -231,6 +231,7 @@ class UnitAI2D:
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
+        print(state_action_values.item())
         with torch.no_grad():
             # Selecting the max Q trains the policy net to approximate the max
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)
@@ -257,7 +258,8 @@ class UnitAI2D:
         target_model_state_dict = self.target_model.state_dict()
         policy_model_state_dict = self.policy_model.state_dict()
         for key in policy_model_state_dict:
-            target_model_state_dict[key] = policy_model_state_dict[key] * TAU + target_model_state_dict[key] * (1 - TAU)
+            target_model_state_dict[key] = (policy_model_state_dict[key] * TAU) \
+                                           + (target_model_state_dict[key] * (1 - TAU))
         self.target_model.load_state_dict(target_model_state_dict)
 
         # Decays the random move tendency
