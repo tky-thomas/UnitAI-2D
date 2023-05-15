@@ -5,9 +5,9 @@ import arcade
 import astar_pathfind as astar
 import numpy as np
 
-PLAYER = 1
+PLAYER = 10
 ENEMY = 2
-OBSTACLE = 3
+OBSTACLE = 6
 UNIT_MARKER = 5
 
 UP = 1
@@ -188,16 +188,15 @@ class Enemy(arcade.Sprite):
 
         # Move to the specified location by the action
         self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        target_pos = (-1, -1)  # Not movable, signifies the enemy should do nothing
+        if action == DOWN:
+            target_pos = (self_pos[0], self_pos[1] - 1)
         if action == UP:
             target_pos = (self_pos[0], self_pos[1] + 1)
-        elif action == DOWN:
-            target_pos = (self_pos[0], self_pos[1] - 1)
-        elif action == RIGHT:
+        if action == RIGHT:
             target_pos = (self_pos[0] + 1, self_pos[1])
-        elif action == LEFT:
+        if action == LEFT:
             target_pos = (self_pos[0] - 1, self_pos[1])
-        else:
-            target_pos = (-1, -1)  # Not movable, signifies the enemy should do nothing
 
         if self.movable(target_pos):
             self.center_x = ((target_pos[0] * self.grid_width) + self.grid_width / 2)
@@ -205,7 +204,8 @@ class Enemy(arcade.Sprite):
         else:
             # TODO: LINE OF SIGHT
             if self.player_in_range():
-                # Deal damage to the player
+                # Deal damage to the player and add score
+                self.damage_dealt += 1
                 self.player.damage(1)
 
     def update_grid(self, grid: np.array):

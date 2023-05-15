@@ -5,6 +5,8 @@ and relaying this information to game objects.
 Also, responsible for generating new enemy entities as they are killed.
 """
 import arcade.sprite
+
+import entities
 from entities import *
 
 GRID_SIZE = 20
@@ -15,10 +17,18 @@ MAP_ID = 0
 ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
 
-PLAYER = 1
+# Multi-channel 2D grid representation used for neural network
+C_SELF = 0
+C_OBSTACLE = 1
+C_ENEMY = 2
+C_PLAYER = 3
+ENEMY_SIGHT_RANGE = 15
+
+# Single-channel grid object representation (legacy, but still used)
+PLAYER = 10
 ENEMY = 2
-OBSTACLE = 3
-ENEMY_FOCUSED = 10
+OBSTACLE = 6
+ENEMY_FOCUSED = 15
 
 
 class Environment:
@@ -136,6 +146,8 @@ class Environment:
         return rewards
 
     def get_map(self):
+        # CHANNEL ORDER: Self, Obstacles/Map Bounds, Other Enemies, Player (or his minimapped position)
+
         # Start with an empty grid
         grid = np.zeros((self.grids_y, self.grids_x))
 
@@ -145,26 +157,79 @@ class Environment:
             for pos in grid_positions:
                 grid[pos[1]][pos[0]] = OBSTACLE
 
-        # Loops through all the player and enemy entities
-        x, y = get_grid_pos(self.player)
-        grid[y][x] = PLAYER
-
+        # Position of other enemies is given to the map output
         for enemy in self.enemies:
             x, y = get_grid_pos(enemy)
             grid[y][x] = ENEMY
 
+        # Position of player
+        x, y = get_grid_pos(self.player)
+        grid[y][x] = PLAYER
+
         return grid
 
     def get_state_maps(self):
+        world_map = self.get_map()
         state_maps = list()
+
+        # Creates a 15x15 map region representing each unit's sight range
         for enemy in self.enemies:
-            state_map = self.grid.copy()
+            state_map = np.zeros((4, ENEMY_SIGHT_RANGE, ENEMY_SIGHT_RANGE))
             x, y = get_grid_pos(enemy)
-            state_map[y][x] = ENEMY_FOCUSED
+            start_x = x - math.floor(ENEMY_SIGHT_RANGE / 2)  # 7 by default
+            start_y = y - math.floor(ENEMY_SIGHT_RANGE / 2)
 
-            # Adds one channel dimension to the state map
-            state_map = np.expand_dims(state_map, axis=0)
+            # Generates a state map focused on the enemy unit
+            # Centers the self-representation on the middle of this sight map
+            state_map[C_SELF][math.floor(ENEMY_SIGHT_RANGE / 2)][math.floor(ENEMY_SIGHT_RANGE / 2)] = 1
 
+            # Obstacles
+            for i in range(len(state_map[C_OBSTACLE])):
+                for j in range(len(state_map[C_OBSTACLE][i])):
+                    pos = (start_x + j, start_y + i)
+                    if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
+                        state_map[C_OBSTACLE][i][j] = 1
+                    else:
+                        if world_map[pos[1]][pos[0]] == OBSTACLE:
+                            state_map[C_OBSTACLE][i][j] = 1
+
+            # Enemies
+            for i in range(len(state_map[C_ENEMY])):
+                for j in range(len(state_map[C_ENEMY][i])):
+                    pos = (start_x + j, start_y + i)
+                    if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
+                        continue
+                    else:
+                        if world_map[pos[1]][pos[0]] == ENEMY:
+                            state_map[C_ENEMY][i][j] = 1
+
+            # Player
+            player_on_map = False
+            for i in range(len(state_map[C_PLAYER])):
+                for j in range(len(state_map[C_PLAYER][i])):
+                    pos = (start_x + j, start_y + i)
+                    if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
+                        continue
+                    else:
+                        if world_map[pos[1]][pos[0]] == PLAYER:
+                            player_on_map = True
+                            state_map[C_PLAYER][i][j] = 1
+
+            # Puts the player on the map border if not in the map already
+            if not player_on_map:
+                # Find player pos
+                player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
+                x_diff = player_pos[0] - x
+                y_diff = player_pos[1] - y
+                if x_diff > enemy.range:
+                    pmark_x = (enemy.range * 2)
+                else:
+                    pmark_x = 0
+                if y_diff > enemy.range:
+                    pmark_y = (enemy.range * 2)
+                else:
+                    pmark_y = 0
+                state_map[C_PLAYER][pmark_y][pmark_x] = PLAYER
             state_maps.append(state_map)
 
         return state_maps
@@ -173,6 +238,8 @@ class Environment:
         pass
 
     def draw_grid(self):
+        # TODO: Fix later. BUT DO NOT USE THE GRID MODE!
+
         # Draws a gray-bordered grid to help visualize the map
         for i in range(0, self.window_height, GRID_SIZE):
             arcade.draw_line(0, i, self.window_width, i, color=arcade.color.GRAY, line_width=GRID_SIZE / 10)
@@ -207,8 +274,7 @@ class Environment:
             enemy.damage_dealt = 0
 
             # Reward being close to player
-            reward += (1 / enemy.get_distance_from_player())
-
+            reward += 10 - enemy.get_distance_from_player()
             rewards.append(reward)
 
         return rewards

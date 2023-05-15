@@ -23,28 +23,31 @@ GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
 UPDATE_FREQUENCY = 0.05
 
 # Machine learning hyperparameters
-NUM_EPISODES = 100
-EPISODE_CYCLES = 300
+NUM_EPISODES = 200
+EPISODE_CYCLES = 150
 
-EPSILON_START = 0.0
-EPSILON_END = 0.0
-EPSILON_DECAY_RATE = NUM_EPISODES / 2
+EPSILON_START = 0.9
+EPSILON_END = 0.05
+EPSILON_DECAY_RATE = NUM_EPISODES / 4
 
-MEMORY_CAPACITY = 2000
-BATCH_SIZE = 512
+MEMORY_CAPACITY = 2048
+BATCH_SIZE = 1024
 GAMMA = 0.99  # Coefficient of future action value
-LR = 0.001
-TAU = 0.2  # Rate at which target network is updated
+LR = 0.0001
+TAU = 0.005  # Rate at which target network is updated
 
 # Scenario Update
-ENABLE_PLAYER = False
+ENABLE_PLAYER = True
 
 # Files
-POLICY_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_policy_2.pt"
-POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy_3.pt"
-TARGET_MODEL_LOAD_PATH = "saved_models/unit_ai_2d_target_2.pt"
-TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target_3.pt"
-RESULT_SAVE_PATH = "results/120523_no_death_ranged_2.pt"
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
+POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy2_2.pt"
+TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
+TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target2_2.pt"
+RESULT_SAVE_PATH = "results/120523_no_death_ranged2_2.pt"
 LOAD_MODEL = True
 SAVE_MODEL = False
 SAVE_RESULT = True
@@ -142,7 +145,7 @@ class UnitAI2D:
         action_list = list()
         for state_map in state_maps:
             # 3D array -> 4D Tensor conversion for model compatibility
-            state_map = torch.Tensor(state_map).unsqueeze(0)
+            state_map = torch.Tensor(state_map).unsqueeze(0).to(self.device)
 
             action_tensor = self.policy_model(state_map)
             action_list.append(self.policy_model.action_translate(action_tensor))
@@ -151,11 +154,11 @@ class UnitAI2D:
         rewards = self.environment.update(delta_time, action_list)
         next_state_maps = self.environment.get_state_maps()
 
-        # Saves the state, action, reward and next state for training.
-        for i in range(5):
+        # Saves the state, action, reward and next state of ten random agents.
+        for i in range(10):
             state_idx = random.randint(0, len(state_maps) - 1)
             state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
-            action_t = action_list[state_idx].reshape(1, )
+            action_t = torch.tensor([action_list[state_idx]], dtype=torch.int64, device=self.device)
             next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
             reward_t = torch.tensor([rewards[state_idx]], dtype=torch.float32, device=self.device)
             self.memory.push(state_t, action_t, reward_t, next_state_t)
@@ -182,11 +185,13 @@ class UnitAI2D:
         self.target_model = DeepQNetwork_FullMap(eps_start=EPSILON_START,
                                                  eps_end=EPSILON_END,
                                                  eps_decay=EPSILON_DECAY_RATE)
+
+        # Weight initialization
         self.target_model.load_state_dict(self.policy_model.state_dict())
         # Model loading
         if self.load_model:
-            self.policy_model.load_state_dict(torch.load(self.policy_model_load_path))
-            self.target_model.load_state_dict(torch.load(self.target_model_load_path))
+            self.policy_model.load_state_dict(torch.load(self.policy_model_load_path, map_location=torch.device('cpu')))
+            self.target_model.load_state_dict(torch.load(self.target_model_load_path, map_location=torch.device('cpu')))
         print('\nModel:')
         print(self.policy_model)
 
@@ -227,11 +232,11 @@ class UnitAI2D:
         reward_batch = torch.stack(batch.reward)
         next_state_batch = torch.stack(batch.next_state)
 
+
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
-        print(state_action_values.item())
         with torch.no_grad():
             # Selecting the max Q trains the policy net to approximate the max
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)
