@@ -18,22 +18,19 @@ class DeepQNetwork_FullMap(nn.Module):
         self.eps_decay = eps_decay
         self.steps = 0
 
-        C1, C2, C3 = 1, 1, 1
+        C1, C2 = 8, 16
         self.cnn_model = nn.Sequential(
-            nn.Conv2d(1, C1, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
+            nn.Conv2d(4, C1, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(C1),
-            nn.Conv2d(C1, C2, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
+            nn.Conv2d(C1, C2, kernel_size=3, stride=3, padding=2),
             nn.BatchNorm2d(C2),
-            nn.Conv2d(C2, C3, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.BatchNorm2d(C3)
         )
 
         self.action_selector = nn.Sequential(
-            nn.Linear(169, 128),
-            nn.Linear(128, num_actions),
+            nn.Linear(576, 256),
+            nn.Linear(256, num_actions),
         )
 
     def forward(self, x):

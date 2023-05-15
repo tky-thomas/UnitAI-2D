@@ -17,12 +17,14 @@ MAP_ID = 0
 ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
 
+# Multi-channel 2D grid representation used for neural network
 C_SELF = 0
 C_OBSTACLE = 1
 C_ENEMY = 2
 C_PLAYER = 3
 ENEMY_SIGHT_RANGE = 15
 
+# Single-channel grid object representation (legacy, but still used)
 PLAYER = 10
 ENEMY = 2
 OBSTACLE = 6
@@ -146,23 +148,23 @@ class Environment:
     def get_map(self):
         # CHANNEL ORDER: Self, Obstacles/Map Bounds, Other Enemies, Player (or his minimapped position)
 
-        # Start with an empty grid with multiple channels
-        grid = np.zeros((4, self.grids_y, self.grids_x))
+        # Start with an empty grid
+        grid = np.zeros((self.grids_y, self.grids_x))
 
         # Loops through all the grid positions, checking for obstacle collisions
         for obstacle in self.obstacles:
             grid_positions = get_grid_positions_box(obstacle)
             for pos in grid_positions:
-                grid[C_OBSTACLE][pos[1]][pos[0]] = 1
+                grid[pos[1]][pos[0]] = OBSTACLE
 
         # Position of other enemies is given to the map output
         for enemy in self.enemies:
             x, y = get_grid_pos(enemy)
-            grid[C_ENEMY][y][x] = 1
+            grid[y][x] = ENEMY
 
         # Position of player
         x, y = get_grid_pos(self.player)
-        grid[C_PLAYER][y][x] = 1
+        grid[y][x] = PLAYER
 
         return grid
 
@@ -170,44 +172,64 @@ class Environment:
         world_map = self.get_map()
         state_maps = list()
 
-        # Creates a 15x15 map region for training, based on the enemy sight radius
+        # Creates a 15x15 map region representing each unit's sight range
         for enemy in self.enemies:
-            state_map = np.zeros(((enemy.range * 2) + 1, (enemy.range * 2) + 1))
+            state_map = np.zeros((4, ENEMY_SIGHT_RANGE, ENEMY_SIGHT_RANGE))
             x, y = get_grid_pos(enemy)
-            start_x = x - enemy.range
-            start_y = y - enemy.range
+            start_x = x - math.floor(ENEMY_SIGHT_RANGE / 2)  # 7 by default
+            start_y = y - math.floor(ENEMY_SIGHT_RANGE / 2)
 
             # Generates a state map focused on the enemy unit
-            player_on_map = False
-            for i, _ in enumerate(state_map):  # Row
-                for j, _ in enumerate(state_map[i]):  # Column
+            # Centers the self-representation on the middle of this sight map
+            state_map[C_SELF][math.floor(ENEMY_SIGHT_RANGE / 2)][math.floor(ENEMY_SIGHT_RANGE / 2)] = 1
+
+            # Obstacles
+            for i in range(len(state_map[C_OBSTACLE])):
+                for j in range(len(state_map[C_OBSTACLE][i])):
                     pos = (start_x + j, start_y + i)
                     if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
-                        state_map[i][j] = -1
+                        state_map[C_OBSTACLE][i][j] = 1
+                    else:
+                        if world_map[pos[1]][pos[0]] == OBSTACLE:
+                            state_map[C_OBSTACLE][i][j] = 1
+
+            # Enemies
+            for i in range(len(state_map[C_ENEMY])):
+                for j in range(len(state_map[C_ENEMY][i])):
+                    pos = (start_x + j, start_y + i)
+                    if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
+                        continue
+                    else:
+                        if world_map[pos[1]][pos[0]] == ENEMY:
+                            state_map[C_ENEMY][i][j] = 1
+
+            # Player
+            player_on_map = False
+            for i in range(len(state_map[C_PLAYER])):
+                for j in range(len(state_map[C_PLAYER][i])):
+                    pos = (start_x + j, start_y + i)
+                    if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
+                        continue
                     else:
                         if world_map[pos[1]][pos[0]] == PLAYER:
                             player_on_map = True
-                        state_map[i][j] = world_map[pos[1]][pos[0]]
-            state_map[enemy.range][enemy.range] = ENEMY_FOCUSED
+                            state_map[C_PLAYER][i][j] = 1
 
-            # Puts the player on the map border as well to draw the enemy in
-            if not player_on_map:
-                # Find player pos
-                player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
-                x_diff = player_pos[0] - x
-                y_diff = player_pos[1] - y
-                if x_diff > enemy.range:
-                    pmark_x = (enemy.range * 2)
-                else:
-                    pmark_x = 0
-                if y_diff > enemy.range:
-                    pmark_y = (enemy.range * 2)
-                else:
-                    pmark_y = 0
-                state_map[pmark_y][pmark_x] = PLAYER
-
-            # Adds one channel dimension to the state map
-            state_map = np.expand_dims(state_map, axis=0)
+            # Puts the player on the map border if not in the map already
+            # if not player_on_map:
+            #     # Find player pos
+            #     player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
+            #     x_diff = player_pos[0] - x
+            #     y_diff = player_pos[1] - y
+            #     if x_diff > enemy.range:
+            #         pmark_x = (enemy.range * 2)
+            #     else:
+            #         pmark_x = 0
+            #     if y_diff > enemy.range:
+            #         pmark_y = (enemy.range * 2)
+            #     else:
+            #         pmark_y = 0
+            #     state_map[pmark_y][pmark_x] = PLAYER
 
             state_maps.append(state_map)
 
@@ -217,6 +239,8 @@ class Environment:
         pass
 
     def draw_grid(self):
+        # TODO: Fix later. BUT DO NOT USE THE GRID MODE!
+
         # Draws a gray-bordered grid to help visualize the map
         for i in range(0, self.window_height, GRID_SIZE):
             arcade.draw_line(0, i, self.window_width, i, color=arcade.color.GRAY, line_width=GRID_SIZE / 10)

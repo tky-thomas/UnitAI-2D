@@ -23,17 +23,17 @@ GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
 UPDATE_FREQUENCY = 0.05
 
 # Machine learning hyperparameters
-NUM_EPISODES = 100
-EPISODE_CYCLES = 200
+NUM_EPISODES = 200
+EPISODE_CYCLES = 150
 
-EPSILON_START = 1
+EPSILON_START = 0.9
 EPSILON_END = 0.05
 EPSILON_DECAY_RATE = NUM_EPISODES / 2
 
-MEMORY_CAPACITY = 2000
+MEMORY_CAPACITY = 2048
 BATCH_SIZE = 1024
 GAMMA = 0.99  # Coefficient of future action value
-LR = 0.1
+LR = 0.0001
 TAU = 0.005  # Rate at which target network is updated
 
 # Scenario Update
