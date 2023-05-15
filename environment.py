@@ -66,9 +66,9 @@ class Environment:
 
         # Generates the obstacles
         self.obstacles = arcade.SpriteList()
-        # for obstacle in MAP_OBSTACLES[MAP_ID]:
-        #     obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
-        #     self.obstacles.append(obstacle_sprite)
+        for obstacle in MAP_OBSTACLES[MAP_ID]:
+            obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
+            self.obstacles.append(obstacle_sprite)
 
         # TODO: Gets an obstacle list and exclude enemy spawnpoints from these locations
 
@@ -216,21 +216,20 @@ class Environment:
                             state_map[C_PLAYER][i][j] = 1
 
             # Puts the player on the map border if not in the map already
-            # if not player_on_map:
-            #     # Find player pos
-            #     player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
-            #     x_diff = player_pos[0] - x
-            #     y_diff = player_pos[1] - y
-            #     if x_diff > enemy.range:
-            #         pmark_x = (enemy.range * 2)
-            #     else:
-            #         pmark_x = 0
-            #     if y_diff > enemy.range:
-            #         pmark_y = (enemy.range * 2)
-            #     else:
-            #         pmark_y = 0
-            #     state_map[pmark_y][pmark_x] = PLAYER
-
+            if not player_on_map:
+                # Find player pos
+                player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
+                x_diff = player_pos[0] - x
+                y_diff = player_pos[1] - y
+                if x_diff > enemy.range:
+                    pmark_x = (enemy.range * 2)
+                else:
+                    pmark_x = 0
+                if y_diff > enemy.range:
+                    pmark_y = (enemy.range * 2)
+                else:
+                    pmark_y = 0
+                state_map[C_PLAYER][pmark_y][pmark_x] = PLAYER
             state_maps.append(state_map)
 
         return state_maps
@@ -275,8 +274,7 @@ class Environment:
             enemy.damage_dealt = 0
 
             # Reward being close to player
-            reward += (1 / enemy.get_distance_from_player())
-
+            reward += 10 - enemy.get_distance_from_player()
             rewards.append(reward)
 
         return rewards

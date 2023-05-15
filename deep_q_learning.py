@@ -2,7 +2,6 @@ import math
 
 import torch.nn as nn
 import torch
-import random
 
 
 class DeepQNetwork_FullMap(nn.Module):
@@ -30,7 +29,8 @@ class DeepQNetwork_FullMap(nn.Module):
 
         self.action_selector = nn.Sequential(
             nn.Linear(576, 256),
-            nn.Linear(256, num_actions),
+            nn.ReLU(),
+            nn.Linear(256, num_actions)
         )
 
     def forward(self, x):
@@ -45,11 +45,9 @@ class DeepQNetwork_FullMap(nn.Module):
         Select an action based on the agent's prediction.
         Random chance of exploring a random move.
         """
-        action = torch.argmax(x)
-        if random.random() < self.eps_start:
-            action = random.randint(0, self.num_actions - 1)
-            action = torch.tensor(action)
-        return action
+        x = nn.Softmax(dim=1)(x)
+        action = torch.multinomial(x, num_samples=1)
+        return action.item()
 
     def random_decay_step(self):
         self.steps += 1

@@ -28,7 +28,7 @@ EPISODE_CYCLES = 150
 
 EPSILON_START = 0.9
 EPSILON_END = 0.05
-EPSILON_DECAY_RATE = NUM_EPISODES / 2
+EPSILON_DECAY_RATE = NUM_EPISODES / 4
 
 MEMORY_CAPACITY = 2048
 BATCH_SIZE = 1024
@@ -37,19 +37,19 @@ LR = 0.0001
 TAU = 0.005  # Rate at which target network is updated
 
 # Scenario Update
-ENABLE_PLAYER = False
+ENABLE_PLAYER = True
 
 # Files
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy_2.pt')
-POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy2_1.pt"
-TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy_2.pt')
-TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target2_1.pt"
-RESULT_SAVE_PATH = "results/120523_no_death_ranged2_1.pt"
-LOAD_MODEL = False
-SAVE_MODEL = True
+POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
+POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy2_2.pt"
+TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
+TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target2_2.pt"
+RESULT_SAVE_PATH = "results/120523_no_death_ranged2_2.pt"
+LOAD_MODEL = True
+SAVE_MODEL = False
 SAVE_RESULT = True
 
 # Random Seed
@@ -158,7 +158,7 @@ class UnitAI2D:
         for i in range(10):
             state_idx = random.randint(0, len(state_maps) - 1)
             state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
-            action_t = action_list[state_idx].reshape(1,).to(self.device)
+            action_t = torch.tensor([action_list[state_idx]], dtype=torch.int64, device=self.device)
             next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
             reward_t = torch.tensor([rewards[state_idx]], dtype=torch.float32, device=self.device)
             self.memory.push(state_t, action_t, reward_t, next_state_t)
@@ -187,12 +187,11 @@ class UnitAI2D:
                                                  eps_decay=EPSILON_DECAY_RATE)
 
         # Weight initialization
-
         self.target_model.load_state_dict(self.policy_model.state_dict())
         # Model loading
         if self.load_model:
-            self.policy_model.load_state_dict(torch.load(self.policy_model_load_path))
-            self.target_model.load_state_dict(torch.load(self.target_model_load_path))
+            self.policy_model.load_state_dict(torch.load(self.policy_model_load_path, map_location=torch.device('cpu')))
+            self.target_model.load_state_dict(torch.load(self.target_model_load_path, map_location=torch.device('cpu')))
         print('\nModel:')
         print(self.policy_model)
 
@@ -232,6 +231,7 @@ class UnitAI2D:
         action_batch = torch.stack(batch.action)
         reward_batch = torch.stack(batch.reward)
         next_state_batch = torch.stack(batch.next_state)
+
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
