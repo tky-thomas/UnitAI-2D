@@ -5,6 +5,8 @@ and relaying this information to game objects.
 Also, responsible for generating new enemy entities as they are killed.
 """
 import arcade.sprite
+
+import entities
 from entities import *
 
 GRID_SIZE = 20
@@ -15,10 +17,16 @@ MAP_ID = 0
 ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
 
-PLAYER = 1
+C_SELF = 0
+C_OBSTACLE = 1
+C_ENEMY = 2
+C_PLAYER = 3
+ENEMY_SIGHT_RANGE = 15
+
+PLAYER = 10
 ENEMY = 2
-OBSTACLE = 3
-ENEMY_FOCUSED = 10
+OBSTACLE = 6
+ENEMY_FOCUSED = 15
 
 
 class Environment:
@@ -56,9 +64,9 @@ class Environment:
 
         # Generates the obstacles
         self.obstacles = arcade.SpriteList()
-        for obstacle in MAP_OBSTACLES[MAP_ID]:
-            obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
-            self.obstacles.append(obstacle_sprite)
+        # for obstacle in MAP_OBSTACLES[MAP_ID]:
+        #     obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
+        #     self.obstacles.append(obstacle_sprite)
 
         # TODO: Gets an obstacle list and exclude enemy spawnpoints from these locations
 
@@ -136,28 +144,33 @@ class Environment:
         return rewards
 
     def get_map(self):
-        # Start with an empty grid
-        grid = np.zeros((self.grids_y, self.grids_x))
+        # CHANNEL ORDER: Self, Obstacles/Map Bounds, Other Enemies, Player (or his minimapped position)
+
+        # Start with an empty grid with multiple channels
+        grid = np.zeros((4, self.grids_y, self.grids_x))
 
         # Loops through all the grid positions, checking for obstacle collisions
         for obstacle in self.obstacles:
             grid_positions = get_grid_positions_box(obstacle)
             for pos in grid_positions:
-                grid[pos[1]][pos[0]] = OBSTACLE
+                grid[C_OBSTACLE][pos[1]][pos[0]] = 1
 
-        # Loops through all the player and enemy entities
-        x, y = get_grid_pos(self.player)
-        grid[y][x] = PLAYER
-
+        # Position of other enemies is given to the map output
         for enemy in self.enemies:
             x, y = get_grid_pos(enemy)
-            grid[y][x] = ENEMY
+            grid[C_ENEMY][y][x] = 1
+
+        # Position of player
+        x, y = get_grid_pos(self.player)
+        grid[C_PLAYER][y][x] = 1
 
         return grid
 
     def get_state_maps(self):
         world_map = self.get_map()
         state_maps = list()
+
+        # Creates a 15x15 map region for training, based on the enemy sight radius
         for enemy in self.enemies:
             state_map = np.zeros(((enemy.range * 2) + 1, (enemy.range * 2) + 1))
             x, y = get_grid_pos(enemy)
@@ -165,14 +178,33 @@ class Environment:
             start_y = y - enemy.range
 
             # Generates a state map focused on the enemy unit
+            player_on_map = False
             for i, _ in enumerate(state_map):  # Row
                 for j, _ in enumerate(state_map[i]):  # Column
                     pos = (start_x + j, start_y + i)
                     if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
                         state_map[i][j] = -1
                     else:
+                        if world_map[pos[1]][pos[0]] == PLAYER:
+                            player_on_map = True
                         state_map[i][j] = world_map[pos[1]][pos[0]]
             state_map[enemy.range][enemy.range] = ENEMY_FOCUSED
+
+            # Puts the player on the map border as well to draw the enemy in
+            if not player_on_map:
+                # Find player pos
+                player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
+                x_diff = player_pos[0] - x
+                y_diff = player_pos[1] - y
+                if x_diff > enemy.range:
+                    pmark_x = (enemy.range * 2)
+                else:
+                    pmark_x = 0
+                if y_diff > enemy.range:
+                    pmark_y = (enemy.range * 2)
+                else:
+                    pmark_y = 0
+                state_map[pmark_y][pmark_x] = PLAYER
 
             # Adds one channel dimension to the state map
             state_map = np.expand_dims(state_map, axis=0)

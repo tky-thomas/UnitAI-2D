@@ -24,17 +24,17 @@ UPDATE_FREQUENCY = 0.05
 
 # Machine learning hyperparameters
 NUM_EPISODES = 100
-EPISODE_CYCLES = 300
+EPISODE_CYCLES = 200
 
-EPSILON_START = 0.9
+EPSILON_START = 1
 EPSILON_END = 0.05
 EPSILON_DECAY_RATE = NUM_EPISODES / 2
 
 MEMORY_CAPACITY = 2000
-BATCH_SIZE = 512
+BATCH_SIZE = 1024
 GAMMA = 0.99  # Coefficient of future action value
-LR = 0.001
-TAU = 0.2  # Rate at which target network is updated
+LR = 0.1
+TAU = 0.005  # Rate at which target network is updated
 
 # Scenario Update
 ENABLE_PLAYER = False
@@ -44,12 +44,12 @@ __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy_2.pt')
-POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy_3.pt"
+POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy2_1.pt"
 TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy_2.pt')
-TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target_3.pt"
-RESULT_SAVE_PATH = "results/120523_no_death_ranged_2.pt"
+TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target2_1.pt"
+RESULT_SAVE_PATH = "results/120523_no_death_ranged2_1.pt"
 LOAD_MODEL = False
-SAVE_MODEL = False
+SAVE_MODEL = True
 SAVE_RESULT = True
 
 # Random Seed
@@ -155,7 +155,7 @@ class UnitAI2D:
         next_state_maps = self.environment.get_state_maps()
 
         # Saves the state, action, reward and next state for training.
-        for i in range(5):
+        for i in range(10):
             state_idx = random.randint(0, len(state_maps) - 1)
             state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
             action_t = action_list[state_idx].reshape(1, )
