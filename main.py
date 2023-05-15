@@ -145,7 +145,7 @@ class UnitAI2D:
         action_list = list()
         for state_map in state_maps:
             # 3D array -> 4D Tensor conversion for model compatibility
-            state_map = torch.Tensor(state_map).unsqueeze(0)
+            state_map = torch.Tensor(state_map).unsqueeze(0).to(self.device)
 
             action_tensor = self.policy_model(state_map)
             action_list.append(self.policy_model.action_translate(action_tensor))
@@ -154,11 +154,11 @@ class UnitAI2D:
         rewards = self.environment.update(delta_time, action_list)
         next_state_maps = self.environment.get_state_maps()
 
-        # Saves the state, action, reward and next state for training.
+        # Saves the state, action, reward and next state of ten random agents.
         for i in range(10):
             state_idx = random.randint(0, len(state_maps) - 1)
             state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
-            action_t = action_list[state_idx].reshape(1, )
+            action_t = action_list[state_idx].reshape(1,).to(self.device)
             next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
             reward_t = torch.tensor([rewards[state_idx]], dtype=torch.float32, device=self.device)
             self.memory.push(state_t, action_t, reward_t, next_state_t)
