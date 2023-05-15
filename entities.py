@@ -111,6 +111,7 @@ class Enemy(arcade.Sprite):
         self.update_freq = update_freq
         self.update_timer = 0
         self.draw_path = False
+        self.health = 3
 
         self.path = list()
         self.pathfind_cycles = PATHFIND_CYCLES
@@ -254,8 +255,10 @@ class Enemy(arcade.Sprite):
         return True
 
     def damage(self):
-        # For now everything dies in a one hit kill
-        self.remove_from_sprite_lists()
+        # 3 HP to start
+        self.health -= 1
+        if self.health <= 0:
+            self.remove_from_sprite_lists()
 
 
 def get_distance(pos1, pos2):
