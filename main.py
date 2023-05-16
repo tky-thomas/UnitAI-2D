@@ -399,7 +399,9 @@ def main(graphics_mode=ENABLE_GRAPHICS):
             os.makedirs(os.path.dirname(RESULT_SAVE_PATH))
 
     result = {'loss': ai2d.network_losses,
-              'reward': ai2d.reward_history}
+              'reward': ai2d.reward_history,
+              'damage': ai2d.damage_history,
+              'scatter_density': ai2d.avg_scatter_density_history}
     with open(RESULT_SAVE_PATH, 'wb') as result_file:
         pickle.dump(result, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
