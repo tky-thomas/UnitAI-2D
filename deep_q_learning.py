@@ -5,17 +5,9 @@ import torch
 
 
 class DeepQNetwork_FullMap(nn.Module):
-    def __init__(self, num_actions=5,
-                 eps_start=0.3,
-                 eps_end=0.05,
-                 eps_decay=0.9):
+    def __init__(self, num_actions=5):
         super().__init__()
         self.num_actions = num_actions
-        self.eps = 0
-        self.eps_start = eps_start
-        self.eps_end = eps_end
-        self.eps_decay = eps_decay
-        self.steps = 0
 
         C1, C2 = 8, 16
         self.cnn_model = nn.Sequential(
@@ -40,7 +32,8 @@ class DeepQNetwork_FullMap(nn.Module):
 
         return x
 
-    def action_translate(self, x):
+    @staticmethod
+    def action_translate(x):
         """
         Select an action based on the agent's prediction.
         Random chance of exploring a random move.
@@ -49,12 +42,11 @@ class DeepQNetwork_FullMap(nn.Module):
         action = torch.multinomial(x, num_samples=1)
         return action.item()
 
-    def random_decay_step(self):
-        self.steps += 1
-        self.eps = self.eps_end + (self.eps_start * math.exp(-1 * self.steps / self.eps_decay))
-
 
 class CNNReceptiveChunk(nn.Module):
+    """
+    Deprecated network structure
+    """
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.in_channels = in_channels

@@ -17,67 +17,89 @@ from replay_memory import DeepQReplay, StateTransition
 
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
-WINDOW_TITLE = "UnitAI2D"
-GRAPHICS_MODE = "display"  # OPTIONS: display, no-display
+WINDOW_TITLE = 'UnitAI2D'
+ENABLE_GRAPHICS = True
 
 UPDATE_FREQUENCY = 0.05
+
+ENABLE_PLAYER = True
 
 # Machine learning hyperparameters
 NUM_EPISODES = 200
 EPISODE_CYCLES = 150
 
-EPSILON_START = 0.9
-EPSILON_END = 0.05
-EPSILON_DECAY_RATE = NUM_EPISODES / 4
+# LEGACY: Code of the Epsilon-greedy step selection preserved for reference.
+# It did not work.
+# EPSILON_START = 0.9
+# EPSILON_END = 0.05
+# EPSILON_DECAY_RATE = NUM_EPISODES / 4
 
 MEMORY_CAPACITY = 2048
 BATCH_SIZE = 1024
 GAMMA = 0.99  # Coefficient of future action value
-LR = 0.0001
-TAU = 0.005  # Rate at which target network is updated
-
-# Scenario Update
-ENABLE_PLAYER = True
+LR = 0.00001  # Learning rate of policy network.
+TAU = 0.005  # Rate at which target network is updated - separate target and policy networks create smoother training
 
 # Files
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
-POLICY_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_policy2_2.pt"
-TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
-TARGET_MODEL_SAVE_PATH = "saved_models/unit_ai_2d_target2_2.pt"
-RESULT_SAVE_PATH = "results/120523_no_death_ranged2_2.pt"
+PROGRAM_MODE = 'train'  # OPTIONS: 'train', 'simulate'
 LOAD_MODEL = True
-SAVE_MODEL = False
+SAVE_MODEL = True
 SAVE_RESULT = True
+
+POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
+POLICY_MODEL_SAVE_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_3.pt')
+TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_target2_2.pt')
+TARGET_MODEL_SAVE_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_target2_3.pt')
+RESULT_SAVE_PATH = os.path.join(__location__, 'results/120523_no_death_ranged2_3.pt')
+SIMULATION_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_3.pt')
 
 # Random Seed
 RANDOM_SEED = None
 
 
 class UnitAI2D:
-    def __init__(self, width, height, training_batch_size=32, gamma=0.99, graphics_enabled=False,
+    def __init__(self, width, height,
+                 program_mode='train',
+                 graphics_enabled=False,
                  num_episodes=100, episode_cycles=200,
+                 update_freq=0.05,
+                 episode_sample_size=10,
+                 training_batch_size=32,
+                 gamma=0.99, lr=0.0001, tau=0.005,
                  load_model=False, save_model=False,
                  policy_model_load_path=None, policy_model_save_path=None,
                  target_model_load_path=None, target_model_save_path=None,
+                 simulation_load_path=None,
                  enable_player=False):
-        self.environment = None
-        self.update_timer = None
-        self.cycle_timer = None
-        self.episode_timer = 1
-        self.update_freq = None
         self.width = width
         self.height = height
         self.graphics_enabled = graphics_enabled
+        self.environment = None
+        self.enable_player = enable_player
 
-        # Deep learning model setup
+        self.num_episodes = num_episodes
+        self.episode_counter = 1
+        self.update_freq = update_freq
+        self.update_timer = None
+        self.episode_cycles = episode_cycles
+        self.episode_cycle_counter = None
+
+        # Deep learning model
+        self.program_mode = program_mode
         self.policy_model = None
         self.target_model = None
         self.device = None
         self.optimizer = None
         self.memory = None
+
+        self.episode_sample_size = episode_sample_size
+        self.training_batch_size = training_batch_size
+        self.gamma = gamma
+        self.lr = lr
+        self.tau = tau
 
         # Model loading and saving
         self.load_model = load_model
@@ -86,87 +108,108 @@ class UnitAI2D:
         self.policy_model_save_path = policy_model_save_path
         self.target_model_load_path = target_model_load_path
         self.target_model_save_path = target_model_save_path
+        self.simulation_load_path = simulation_load_path
 
         # Saving episode data
         self.network_losses = list()
         self.reward_history = list()
+        self.damage_history = list()
+        self.avg_scatter_density_history = list()
+        self.episode_scatter_densities = list()
 
-        self.training_batch_size = training_batch_size
-        self.gamma = gamma
-        self.episode_cycles = episode_cycles
-        self.num_episodes = num_episodes
-        self.enable_player = enable_player
         self.machine_learning_setup()
 
     def setup(self):
+        """
+        Resets the environment at the beginning of each episode.
+        :return:
+        """
         self.update_timer = 0
-        self.cycle_timer = 0
-        self.update_freq = UPDATE_FREQUENCY
+        self.episode_cycle_counter = 0
+        self.episode_scatter_densities = list()
         self.environment = \
             Environment(self.width, self.height, self.update_freq, self.graphics_enabled, self.enable_player)
 
     def on_update(self, delta_time):
+        """
+        Updates the environment on every cycle of an episode.
+        Can perform updates according to a delta_time, where one cycle is performed according to update_freq.
+        For low update_freq, the computation time for machine learning usually exceeds update_freq,
+        causing actual update frequency to be lower.
+        :param delta_time: Time elapsed since the last time this function was called.
+        :return:
+        """
         # Update timer
         self.update_timer += delta_time
         if self.update_timer < self.update_freq:
             return
         self.update_timer = 0
 
-        # Episode cycle counter. Returns True when number of episode cycles has been reached.
-        self.cycle_timer += 1
-        if self.cycle_timer > self.episode_cycles:
+        # Episode cycle counter
+        # Initiates one training step when the episode has concluded.
+        self.episode_cycle_counter += 1
+        if self.episode_cycle_counter > self.episode_cycles:
 
-            network_loss, total_reward = self.train_network()
-            self.network_losses.append(network_loss)
-            self.reward_history.append(total_reward)
+            if self.program_mode == 'train':
+                network_loss, total_reward = self.train_network()
+                self.network_losses.append(network_loss)
+                self.reward_history.append(total_reward)
+            self.damage_history.append(self.environment.previous_player_damage)
+            self.avg_scatter_density_history.append(sum(self.episode_scatter_densities)
+                                                    / len(self.episode_scatter_densities))
 
-            self.episode_timer += 1
-            if self.episode_timer > self.num_episodes:
+            self.stdout_write("Damage: %d  Avg. Scatter Density %.2f  "
+                              % (self.environment.previous_player_damage,
+                                 sum(self.episode_scatter_densities) / len(self.episode_scatter_densities)))
+            self.stdout_write("\n")
+
+            self.episode_counter += 1
+            if self.episode_counter > self.num_episodes:
                 return True
             self.setup()
 
-        # Draw a progress bar
-        i_bars = math.floor(self.cycle_timer * 20 / self.episode_cycles)
-        sys.stdout.write('\r')
-        sys.stdout.write("Episode %d/%d: [%-20s] %d%%    %d | %d    "
-                         % (self.episode_timer,
-                            self.num_episodes,
-                            '=' * i_bars,
-                            round(self.cycle_timer * 100 / self.episode_cycles),
-                            self.cycle_timer,
-                            self.episode_cycles))
-        sys.stdout.flush()
-        time.sleep(0.001)
+        self.draw_progress_bar()
 
-        # Model returns information about all units
+        # State-action loop.
         state_maps = self.environment.get_state_maps()
-
-        # For each unit, the model selects an action
         action_list = list()
         for state_map in state_maps:
-            # 3D array -> 4D Tensor conversion for model compatibility
+            # Pads the batch size dimension
             state_map = torch.Tensor(state_map).unsqueeze(0).to(self.device)
 
-            action_tensor = self.policy_model(state_map)
-            action_list.append(self.policy_model.action_translate(action_tensor))
+            # The model does not train the layers translating the raw output of the network into an action
+            action_t = self.policy_model(state_map)
+            action_list.append(self.policy_model.action_translate(action_t))
 
-        # Action is fed back into the network
-        rewards = self.environment.update(delta_time, action_list)
+        rewards, scatter_density = self.environment.update(delta_time, action_list)
+        if scatter_density is not None:
+            self.episode_scatter_densities.append(scatter_density)
+
         next_state_maps = self.environment.get_state_maps()
 
-        # Saves the state, action, reward and next state of ten random agents.
-        for i in range(10):
-            state_idx = random.randint(0, len(state_maps) - 1)
-            state_t = torch.tensor(state_maps[state_idx], dtype=torch.float32, device=self.device)
-            action_t = torch.tensor([action_list[state_idx]], dtype=torch.int64, device=self.device)
-            next_state_t = torch.tensor(next_state_maps[state_idx], dtype=torch.float32, device=self.device)
-            reward_t = torch.tensor([rewards[state_idx]], dtype=torch.float32, device=self.device)
-            self.memory.push(state_t, action_t, reward_t, next_state_t)
+        # Samples transitions from several random agents.
+        if self.program_mode == 'train':
+            for i in range(self.episode_sample_size):
+                sample_index = random.randint(0, len(state_maps) - 1)
 
-        # Return false to continue training
+                state_t = torch.tensor(state_maps[sample_index], dtype=torch.float32, device=self.device)
+                next_state_t = torch.tensor(next_state_maps[sample_index], dtype=torch.float32, device=self.device)
+
+                # Pads the raw int with an extra dimension before tensor conversion
+                action_t = torch.tensor([action_list[sample_index]], dtype=torch.int64, device=self.device)
+                reward_t = torch.tensor([rewards[sample_index]], dtype=torch.float32, device=self.device)
+
+                self.memory.push(state_t, action_t, reward_t, next_state_t)
+
+        # Return False to continue training
         return False
 
     def machine_learning_setup(self):
+        """
+        Additional code to setup the machine learning models,
+        separated from the init method for convenience.
+        :return:
+        """
         # ====================
         # REPLAY MEMORY (DATASET)
         # ====================
@@ -175,26 +218,14 @@ class UnitAI2D:
         # ====================
         # MODEL
         # ====================
-        if self.save_model:
+        if self.save_model and self.program_mode == 'train':
             if not os.path.isdir(os.path.dirname(self.policy_model_save_path)):
                 os.makedirs(os.path.dirname(self.policy_model_save_path))
 
-        self.policy_model = DeepQNetwork_FullMap(eps_start=EPSILON_START,
-                                                 eps_end=EPSILON_END,
-                                                 eps_decay=EPSILON_DECAY_RATE)
-        self.target_model = DeepQNetwork_FullMap(eps_start=EPSILON_START,
-                                                 eps_end=EPSILON_END,
-                                                 eps_decay=EPSILON_DECAY_RATE)
+        self.policy_model = DeepQNetwork_FullMap()
+        self.target_model = DeepQNetwork_FullMap()
 
-        # Weight initialization
-        self.target_model.load_state_dict(self.policy_model.state_dict())
-        # Model loading
-        if self.load_model:
-            self.policy_model.load_state_dict(torch.load(self.policy_model_load_path, map_location=torch.device('cpu')))
-            self.target_model.load_state_dict(torch.load(self.target_model_load_path, map_location=torch.device('cpu')))
-        print('\nModel:')
-        print(self.policy_model)
-
+        # CUDA and training device settings
         use_cuda = torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
         print('Device: {}'.format(self.device))
@@ -206,11 +237,23 @@ class UnitAI2D:
             self.policy_model.cuda()
             self.target_model.cuda()
 
+        # Initializes the target model to be the same as the training model
+        self.target_model.load_state_dict(self.policy_model.state_dict())
+
+        # Model loading
+        if self.load_model:
+            self.policy_model.load_state_dict(torch.load(self.policy_model_load_path, map_location=self.device))
+            self.target_model.load_state_dict(torch.load(self.target_model_load_path, map_location=self.device))
+        if self.program_mode == 'simulate':
+            self.policy_model.load_state_dict(torch.load(self.simulation_load_path, map_location=self.device))
+
+        print('\nModel:')
+        print(self.policy_model)
+
+        # Parameter counting
         params = [p.nelement() for p in self.policy_model.parameters() if p.requires_grad]
         num_params = sum(params)
-
-        print('num_params:', num_params)
-        print(flush=True)
+        self.stdout_write('num_params: %d\n' % num_params)
 
         # ====================
         # OPTIMIZER
@@ -220,8 +263,11 @@ class UnitAI2D:
         print(self.optimizer)
 
     def train_network(self):
-        # TODO: CLEAN UP COMMENTS
-        # Gets a sample from the memory
+        """
+        Training pipeline to perform a training step on the neural network.
+        :return:
+        """
+        # Samples a training batch from memory, converting it to useful form
         if len(self.memory) < BATCH_SIZE:
             return
         training_batch = self.memory.sample(BATCH_SIZE)
@@ -232,64 +278,70 @@ class UnitAI2D:
         reward_batch = torch.stack(batch.reward)
         next_state_batch = torch.stack(batch.next_state)
 
-
-        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-        # columns of actions taken. These are the actions which would've been taken
-        # for each batch state according to policy_net
+        # Compute the Q-function values for this state and the max to train the model
         state_action_values = self.policy_model(state_batch).gather(1, action_batch)
         with torch.no_grad():
             # Selecting the max Q trains the policy net to approximate the max
             next_state_values = self.target_model(next_state_batch).max(1)[0].unsqueeze(1)
-        # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
         # Huber Loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(state_action_values, expected_state_action_values)
+        self.stdout_write("Total Reward: %.2f  Loss: %.5f  "
+                          % (torch.sum(reward_batch).item(),
+                             loss.item()))
 
-        sys.stdout.write("Total Reward: %.2f  Loss: %.5f  "
-                         % (torch.sum(reward_batch).item(),
-                            loss.item()))
-        sys.stdout.flush()
-        time.sleep(0.001)
-
-        # Optimize the model
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.policy_model.parameters(), 100)
         self.optimizer.step()
 
-        # Updates the target to better match policy
+        # Updates the target to better match policy according self.tau
         target_model_state_dict = self.target_model.state_dict()
         policy_model_state_dict = self.policy_model.state_dict()
         for key in policy_model_state_dict:
-            target_model_state_dict[key] = (policy_model_state_dict[key] * TAU) \
-                                           + (target_model_state_dict[key] * (1 - TAU))
+            target_model_state_dict[key] = (policy_model_state_dict[key] * self.tau) \
+                                           + (target_model_state_dict[key] * (1 - self.tau))
         self.target_model.load_state_dict(target_model_state_dict)
-
-        # Decays the random move tendency
-        self.policy_model.random_decay_step()
 
         # Save the policy and target model
         if self.save_model:
-            sys.stdout.write("Model Saved")
-            sys.stdout.flush()
-            time.sleep(0.001)
             torch.save(self.policy_model.state_dict(), self.policy_model_save_path)
             torch.save(self.target_model.state_dict(), self.target_model_save_path)
-        print()
+            self.stdout_write("Model Saved  ")
 
         # Return the training loss and reward achieved
         return loss.item(), torch.sum(reward_batch).item()
 
+    def draw_progress_bar(self):
+        bars = math.floor(self.episode_cycle_counter * 20 / self.episode_cycles)
+        self.stdout_write('\r', "Episode %d/%d: [%-20s] %d%%    %d | %d    "
+                          % (self.episode_counter,
+                             self.num_episodes,
+                             '=' * bars,
+                             round(self.episode_cycle_counter * 100 / self.episode_cycles),
+                             self.episode_cycle_counter,
+                             self.episode_cycles))
+
+    @staticmethod
+    def stdout_write(*args):
+        for text in args:
+            sys.stdout.write(text)
+        sys.stdout.flush()
+        time.sleep(0.001)
+
 
 class UnitAI2D_Window(arcade.Window):
+    """
+    Simply wraps a Python Arcade window around the training loop,
+    to allow for the game environment to be displayed.
+    """
     def __init__(self, title, ai2d):
         super().__init__(ai2d.width, ai2d.height, title)
         arcade.set_background_color(arcade.color.AMAZON)
 
         self.ai2d = ai2d
-        self.ai2d.graphics_enabled=True
 
     def setup(self):
         self.ai2d.setup()
@@ -304,28 +356,30 @@ class UnitAI2D_Window(arcade.Window):
             self.close()
 
     def on_key_press(self, key, key_modifiers):
-
         # Toggles the grid
         self.ai2d.environment.toggle_visual(key)
 
 
-def main(graphics_mode=GRAPHICS_MODE):
+def main(graphics_mode=ENABLE_GRAPHICS):
     random.seed(RANDOM_SEED)
 
     ai2d = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT,
+                    program_mode=PROGRAM_MODE,
                     num_episodes=NUM_EPISODES, episode_cycles=EPISODE_CYCLES,
-                    training_batch_size=BATCH_SIZE, gamma=GAMMA,
-                    load_model=LOAD_MODEL,
-                    save_model=SAVE_MODEL,
+                    update_freq=UPDATE_FREQUENCY,
+                    training_batch_size=BATCH_SIZE, gamma=GAMMA, lr=LR, tau=TAU,
+                    load_model=LOAD_MODEL, save_model=SAVE_MODEL,
                     policy_model_load_path=POLICY_MODEL_LOAD_PATH,
                     policy_model_save_path=POLICY_MODEL_SAVE_PATH,
                     target_model_load_path=TARGET_MODEL_LOAD_PATH,
                     target_model_save_path=TARGET_MODEL_SAVE_PATH,
+                    simulation_load_path=SIMULATION_LOAD_PATH,
+                    graphics_enabled=ENABLE_GRAPHICS,
                     enable_player=ENABLE_PLAYER)
 
     # If the display is enabled, arcade will run the game.
     # Otherwise, the update cycle will run without a window and draw
-    if graphics_mode == "display":
+    if ENABLE_GRAPHICS:
         game = UnitAI2D_Window(WINDOW_TITLE, ai2d)
         game.setup()
         arcade.run()
@@ -345,7 +399,9 @@ def main(graphics_mode=GRAPHICS_MODE):
             os.makedirs(os.path.dirname(RESULT_SAVE_PATH))
 
     result = {'loss': ai2d.network_losses,
-              'reward': ai2d.reward_history}
+              'reward': ai2d.reward_history,
+              'damage': ai2d.damage_history,
+              'scatter_density': ai2d.avg_scatter_density_history}
     with open(RESULT_SAVE_PATH, 'wb') as result_file:
         pickle.dump(result, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
