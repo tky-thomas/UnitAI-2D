@@ -116,9 +116,6 @@ class Environment:
             self.draw_grid()
 
     def update(self, delta_time, action_list):
-        # Updates the player and enemies
-        self.player.update()
-
         # Updates enemy grid knowledge
         self.grid = self.get_map()
         for enemy in self.enemies:
@@ -133,8 +130,11 @@ class Environment:
         # The player now attacks, removing a random enemy in range.
         # He will pick an enemy close to his previous target, with a random chance of switching targets.
         # This attack may have an AOE.
+        # The scatter density of the AI around the point of impact is also recorded.
+        # Scatter density will be None if nothing is engaged.
+        scatter_density = None
         if self.player_enabled:
-            self.player.update_player(self.enemies)
+            scatter_density = self.player.update_player(self.enemies)
 
         # Respawn dead enemies
         self.spawn_enemies(ENEMY_COUNT - len(self.enemies))
@@ -143,7 +143,7 @@ class Environment:
         self.grid = self.get_map()
         self.previous_player_damage = self.player.damage_received
 
-        return rewards
+        return rewards, scatter_density
 
     def get_map(self):
         # CHANNEL ORDER: Self, Obstacles/Map Bounds, Other Enemies, Player (or his minimapped position)

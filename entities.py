@@ -5,6 +5,8 @@ import arcade
 import astar_pathfind as astar
 import numpy as np
 
+import environment
+
 PLAYER = 10
 ENEMY = 2
 OBSTACLE = 6
@@ -61,6 +63,7 @@ class Player(arcade.Sprite):
                 viable_targets.append(enemy)
 
         # Select a target to destroy. This will be the one closest to the previous target.
+        scatter_distance = None
         if len(viable_targets) > 0:
             targets = list()
             if self.prev_target is None:
@@ -71,18 +74,32 @@ class Player(arcade.Sprite):
                 initial_target = viable_targets[0]
 
             # AOE damage
+            scatter_positions = list()
             for enemy in enemies:
                 # Check if in range
                 enemy_pos = xy_to_pos(enemy.center_x, enemy.center_y, enemy.grid_width)
-                if get_distance(xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width),
-                                enemy_pos) <= self.aoe_range:
+                distance_from_center = get_distance(
+                    xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width),
+                                enemy_pos)
+                if distance_from_center <= self.aoe_range:
                     targets.append(enemy)
+
+                # Check the scatter density of enemies up to 4 units away from the target zone
+                if distance_from_center <= 4:
+                    scatter_positions.append(enemy_pos)
+
+            # Calculates the scatter density of enemies as long as there are at least two
+            if len(scatter_positions) >= 2:
+                scatter_positions = np.array(scatter_positions)
+                distances = np.linalg.norm(scatter_positions[:, np.newaxis] - scatter_positions, axis=2)
+                scatter_distance = np.mean(distances)
 
             self.prev_target = xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width)
 
             for target in targets:
                 target.damage()
 
+        return scatter_distance
 
 class Obstacle(arcade.Sprite):
     def __init__(self, spawn_pos_grid, grids_width, grids_height, grid_width=20):

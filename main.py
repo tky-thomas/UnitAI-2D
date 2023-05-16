@@ -37,16 +37,16 @@ EPISODE_CYCLES = 150
 MEMORY_CAPACITY = 2048
 BATCH_SIZE = 1024
 GAMMA = 0.99  # Coefficient of future action value
-LR = 0.0001  # Learning rate of policy network.
+LR = 0.00001  # Learning rate of policy network.
 TAU = 0.005  # Rate at which target network is updated - separate target and policy networks create smoother training
 
 # Files
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-PROGRAM_MODE = 'simulate'  # OPTIONS: 'train', 'simulate'
+PROGRAM_MODE = 'train'  # OPTIONS: 'train', 'simulate'
 LOAD_MODEL = True
-SAVE_MODEL = False
+SAVE_MODEL = True
 SAVE_RESULT = True
 
 POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
@@ -113,6 +113,9 @@ class UnitAI2D:
         # Saving episode data
         self.network_losses = list()
         self.reward_history = list()
+        self.damage_history = list()
+        self.avg_scatter_density_history = list()
+        self.episode_scatter_densities = list()
 
         self.machine_learning_setup()
 
@@ -123,6 +126,7 @@ class UnitAI2D:
         """
         self.update_timer = 0
         self.episode_cycle_counter = 0
+        self.episode_scatter_densities = list()
         self.environment = \
             Environment(self.width, self.height, self.update_freq, self.graphics_enabled, self.enable_player)
 
@@ -150,6 +154,14 @@ class UnitAI2D:
                 network_loss, total_reward = self.train_network()
                 self.network_losses.append(network_loss)
                 self.reward_history.append(total_reward)
+            self.damage_history.append(self.environment.previous_player_damage)
+            self.avg_scatter_density_history.append(sum(self.episode_scatter_densities)
+                                                    / len(self.episode_scatter_densities))
+
+            self.stdout_write("Damage: %d  Avg. Scatter Density %.2f  "
+                              % (self.environment.previous_player_damage,
+                                 sum(self.episode_scatter_densities) / len(self.episode_scatter_densities)))
+            self.stdout_write("\n")
 
             self.episode_counter += 1
             if self.episode_counter > self.num_episodes:
@@ -169,7 +181,10 @@ class UnitAI2D:
             action_t = self.policy_model(state_map)
             action_list.append(self.policy_model.action_translate(action_t))
 
-        rewards = self.environment.update(delta_time, action_list)
+        rewards, scatter_density = self.environment.update(delta_time, action_list)
+        if scatter_density is not None:
+            self.episode_scatter_densities.append(scatter_density)
+
         next_state_maps = self.environment.get_state_maps()
 
         # Samples transitions from several random agents.
@@ -294,7 +309,7 @@ class UnitAI2D:
         if self.save_model:
             torch.save(self.policy_model.state_dict(), self.policy_model_save_path)
             torch.save(self.target_model.state_dict(), self.target_model_save_path)
-            self.stdout_write("Model Saved\n")
+            self.stdout_write("Model Saved  ")
 
         # Return the training loss and reward achieved
         return loss.item(), torch.sum(reward_batch).item()
