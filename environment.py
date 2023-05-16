@@ -18,12 +18,11 @@ ENEMY_COUNT = 20
 SPAWN_RADIUS = 4
 
 # Multi-channel 2D grid representation used for neural network
-NUM_CHANNELS = 4
 C_SELF = 0
 C_OBSTACLE = 1
 C_ENEMY = 2
 C_PLAYER = 3
-ENEMY_SIGHT_RANGE = 7
+ENEMY_SIGHT_RANGE = 15
 
 # Single-channel grid object representation (legacy, but still used)
 PLAYER = 10
@@ -33,13 +32,8 @@ ENEMY_FOCUSED = 15
 
 
 class Environment:
-    """
-    Game environment. Handles state updates, rendering and reward feedback.
-    """
 
-    def __init__(self, window_width, window_height,
-                 update_freq=1,
-                 graphics_enabled=False,
+    def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False,
                  player_enabled=False):
         self.window_width = window_width
         self.window_height = window_height
@@ -47,10 +41,10 @@ class Environment:
         self.graphics_enabled = graphics_enabled
         self.player_enabled = player_enabled
 
-        # Environment is internally represented as a multi-channel grid
+        # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
         self.grids_y = round(window_height / GRID_SIZE)
-        self.grid = np.zeros((NUM_CHANNELS, self.grids_y, self.grids_x))
+        self.grid = np.zeros((self.grids_y, self.grids_x))
         self.enemy_spawn_grid = None
 
         self.show_grid = False
@@ -65,10 +59,6 @@ class Environment:
         self.generate_world()
 
     def generate_world(self):
-        """
-        Generates the game world and all its elements.
-        :return:
-        """
         # Spawns in the player at the center grid
         self.player = Player((round(self.grids_x / 2),
                               round(self.grids_y / 2)),
@@ -80,7 +70,10 @@ class Environment:
             obstacle_sprite = Obstacle((obstacle[0], obstacle[1]), obstacle[2], obstacle[3])
             self.obstacles.append(obstacle_sprite)
 
-        # Sets up a list of possible enemy spawn locations
+        # TODO: Gets an obstacle list and exclude enemy spawnpoints from these locations
+
+        # Sets up a list to spawn enemies
+        # Enemies will be spawned along the borders of the map
         self.enemy_spawn_grid = []
         for row in range(self.grids_y):
             for column in range(self.grids_x):
@@ -88,10 +81,11 @@ class Environment:
                         or (row < SPAWN_RADIUS or row > (self.grids_y - SPAWN_RADIUS)):
                     self.enemy_spawn_grid.append((column, row))
 
+        # Generates an initial batch of enemy units
         self.enemies = arcade.SpriteList()
         self.spawn_enemies(ENEMY_COUNT)
 
-        # Updates grid knowledge and gives it to the AI enemies
+        # Updates grid knowledge
         self.grid = self.get_map()
         for enemy in self.enemies:
             enemy.update_grid(self.grid)
@@ -108,17 +102,13 @@ class Environment:
         self.previous_player_damage = self.player.damage_received
 
     def draw(self):
-        """
-        Renders the game world.
-        :return:
-        """
         self.player.draw()
         for obstacle in self.obstacles:
             obstacle.draw()
         for enemy in self.enemies:
             enemy.draw()
 
-        # Draw damage dealt to the player
+        # Draw player damage received
         self.damage_text.text = "Damage: " + str(self.player.damage_received)
         self.damage_text.draw()
 
@@ -135,13 +125,13 @@ class Environment:
             enemy.update_grid(self.grid)
 
         for i, enemy in enumerate(self.enemies):
-            enemy.update_qmove(action_list[i])
+            enemy.update_with_action(action_list[i])
 
         # Calculates the reward for this round
         rewards = self.calculate_reward()
 
-        # The player now attacks, damaging a random enemy in range.
-        # He will pick an enemy close to his previous target, with a small chance of randomly targeting instead.
+        # The player now attacks, removing a random enemy in range.
+        # He will pick an enemy close to his previous target, with a random chance of switching targets.
         # This attack may have an AOE.
         if self.player_enabled:
             self.player.update_player(self.enemies)
@@ -156,53 +146,42 @@ class Environment:
         return rewards
 
     def get_map(self):
-        """
-        Gets a multi-channel, binary map of the full game environment.
-        :return: A numpy grid with dimensions (C, H, W) representing the game map. Each channel is a binary notation of
-        whether its corresponding map feature is present in that grid square.
-        """
+        # CHANNEL ORDER: Self, Obstacles/Map Bounds, Other Enemies, Player (or his minimapped position)
+
         # Start with an empty grid
-        grid = np.zeros((NUM_CHANNELS, self.grids_y, self.grids_x))
+        grid = np.zeros((self.grids_y, self.grids_x))
 
-        # Position of obstacles
+        # Loops through all the grid positions, checking for obstacle collisions
         for obstacle in self.obstacles:
-            grid_positions = entities.get_grid_pos_box(obstacle)
+            grid_positions = get_grid_positions_box(obstacle)
             for pos in grid_positions:
-                grid[C_OBSTACLE][pos[1]][pos[0]] = 1
+                grid[pos[1]][pos[0]] = OBSTACLE
 
-        # Position of enemy entities
+        # Position of other enemies is given to the map output
         for enemy in self.enemies:
-            x, y = entities.get_grid_pos(enemy)
-            grid[C_ENEMY][y][x] = 1
+            x, y = get_grid_pos(enemy)
+            grid[y][x] = ENEMY
 
         # Position of player
-        x, y = entities.get_grid_pos(self.player)
-        grid[C_PLAYER][y][x] = 1
+        x, y = get_grid_pos(self.player)
+        grid[y][x] = PLAYER
 
         return grid
 
     def get_state_maps(self):
-        """
-        Somewhat identical to get_map, but returns a list of state maps centered on each enemy, and
-        restricted to their sight range.
-        :return: A list of multi-channel binary state maps for all the enemy units, each centered on an enemy unit
-        and extending to their sight range.
-        Unlike get_map these sight maps can also include portions outside the game world,
-        which are treated as obstacles.
-        """
         world_map = self.get_map()
         state_maps = list()
 
-        # Creates a map region according to the enemy sight range
+        # Creates a 15x15 map region representing each unit's sight range
         for enemy in self.enemies:
-            # Generates a state map focused on the enemy unit
-            state_map = np.zeros((NUM_CHANNELS, (ENEMY_SIGHT_RANGE * 2) + 1, (ENEMY_SIGHT_RANGE * 2) + 1))
-            x, y = entities.get_grid_pos(enemy)
-            start_x = x - ENEMY_SIGHT_RANGE
-            start_y = y - ENEMY_SIGHT_RANGE
+            state_map = np.zeros((4, ENEMY_SIGHT_RANGE, ENEMY_SIGHT_RANGE))
+            x, y = get_grid_pos(enemy)
+            start_x = x - math.floor(ENEMY_SIGHT_RANGE / 2)  # 7 by default
+            start_y = y - math.floor(ENEMY_SIGHT_RANGE / 2)
 
+            # Generates a state map focused on the enemy unit
             # Centers the self-representation on the middle of this sight map
-            state_map[C_SELF][ENEMY_SIGHT_RANGE][ENEMY_SIGHT_RANGE] = 1
+            state_map[C_SELF][math.floor(ENEMY_SIGHT_RANGE / 2)][math.floor(ENEMY_SIGHT_RANGE / 2)] = 1
 
             # Obstacles
             for i in range(len(state_map[C_OBSTACLE])):
@@ -211,7 +190,7 @@ class Environment:
                     if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
                         state_map[C_OBSTACLE][i][j] = 1
                     else:
-                        if world_map[C_OBSTACLE][pos[1]][pos[0]] == 1:
+                        if world_map[pos[1]][pos[0]] == OBSTACLE:
                             state_map[C_OBSTACLE][i][j] = 1
 
             # Enemies
@@ -221,7 +200,7 @@ class Environment:
                     if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
                         continue
                     else:
-                        if world_map[C_ENEMY][pos[1]][pos[0]] == 1:
+                        if world_map[pos[1]][pos[0]] == ENEMY:
                             state_map[C_ENEMY][i][j] = 1
 
             # Player
@@ -232,14 +211,14 @@ class Environment:
                     if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.grids_x or pos[1] >= self.grids_y:
                         continue
                     else:
-                        if world_map[C_PLAYER][pos[1]][pos[0]] == 1:
+                        if world_map[pos[1]][pos[0]] == PLAYER:
                             player_on_map = True
                             state_map[C_PLAYER][i][j] = 1
 
             # Puts the player on the map border if not in the map already
             if not player_on_map:
                 # Find player pos
-                player_pos = entities.get_grid_pos(self.player)
+                player_pos = entities.xy_to_pos(self.player.center_x, self.player.center_y, self.player.grid_width)
                 x_diff = player_pos[0] - x
                 y_diff = player_pos[1] - y
                 if x_diff > enemy.range:
@@ -254,6 +233,9 @@ class Environment:
             state_maps.append(state_map)
 
         return state_maps
+
+    def get_entity_list(self):
+        pass
 
     def draw_grid(self):
         # TODO: Fix later. BUT DO NOT USE THE GRID MODE!
@@ -299,8 +281,25 @@ class Environment:
 
     def spawn_enemies(self, enemy_count):
         for i in range(enemy_count):
+            # Pick a spawn location for the enemy
             enemy_sprite = Enemy(random.choice(self.enemy_spawn_grid), update_freq=self.update_freq, player=self.player)
             self.enemies.append(enemy_sprite)
 
 
+def get_grid_pos(sprite: arcade.Sprite):
+    return math.floor(sprite.center_x / GRID_SIZE), math.floor(sprite.center_y / GRID_SIZE)
 
+
+def get_grid_positions_box(sprite):
+    sprite_bottom_left_pos = (round((sprite.center_x - (sprite.width / 2)) / GRID_SIZE),
+                              round((sprite.center_y - (sprite.height / 2)) / GRID_SIZE))
+    sprite_top_right_pos = (round((sprite.center_x + (sprite.width / 2)) / GRID_SIZE),
+                            round((sprite.center_y + (sprite.height / 2)) / GRID_SIZE))
+
+    grid_positions = list()
+
+    for row in range(sprite_bottom_left_pos[1], sprite_top_right_pos[1]):
+        for column in range(sprite_bottom_left_pos[0], sprite_top_right_pos[0]):
+            grid_positions.append((column, row))
+
+    return grid_positions
