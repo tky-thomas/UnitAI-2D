@@ -15,6 +15,11 @@ RIGHT = 2
 DOWN = 3
 LEFT = 4
 
+C_SELF = 0
+C_OBSTACLE = 1
+C_ENEMY = 2
+C_PLAYER = 3
+
 PATHFIND_CYCLES = 3
 ATTACK_RANGE = 6
 
@@ -24,9 +29,9 @@ PLAYER_AOE = 0
 
 class Player(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, grid_width=20, update_freq=1, range=PLAYER_RANGE, aoe_range=PLAYER_AOE):
+    def __init__(self, spawn_pos, grid_width=20, update_freq=1, range=PLAYER_RANGE, aoe_range=PLAYER_AOE):
         super().__init__()
-        self.pos = spawn_pos_grid
+        self.pos = spawn_pos
         self.update_freq = update_freq
 
         self.damage_received = 0
@@ -38,8 +43,8 @@ class Player(arcade.Sprite):
         # Position the player
         self.height = grid_width
         self.width = grid_width
-        self.center_x = (spawn_pos_grid[0] * grid_width) + round(grid_width / 2)
-        self.center_y = (spawn_pos_grid[1] * grid_width) + round(grid_width / 2)
+        self.center_x = (spawn_pos[0] * grid_width) + round(grid_width / 2)
+        self.center_y = (spawn_pos[1] * grid_width) + round(grid_width / 2)
 
         self.grid_width = grid_width
 
@@ -53,47 +58,49 @@ class Player(arcade.Sprite):
 
     def update_player(self, enemies):
         viable_targets = list()
-        self.pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        self.pos = get_grid_pos(self)
         for enemy in enemies:
             # Check if in range
-            enemy_pos = xy_to_pos(enemy.center_x, enemy.center_y, enemy.grid_width)
+            enemy_pos = get_grid_pos(enemy)
             if get_distance(self.pos, enemy_pos) <= self.range:
                 viable_targets.append(enemy)
 
-        # Select a target to destroy. This will be the one closest to the previous target.
+        # Select a target to attack
         if len(viable_targets) > 0:
             targets = list()
             if self.prev_target is None:
                 initial_target = random.choice(viable_targets)
             else:
                 viable_targets.sort(
-                    key=lambda s: get_distance(self.prev_target, xy_to_pos(s.center_x, s.center_y, s.grid_width)))
+                    key=lambda s: get_distance(self.prev_target, get_grid_pos(s)))
                 initial_target = viable_targets[0]
 
             # AOE damage
             for enemy in enemies:
-                # Check if in range
-                enemy_pos = xy_to_pos(enemy.center_x, enemy.center_y, enemy.grid_width)
-                if get_distance(xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width),
-                                enemy_pos) <= self.aoe_range:
+                # Check if in range of AOE
+                enemy_pos = get_grid_pos(enemy)
+                if get_distance(get_grid_pos(initial_target), enemy_pos) <= self.aoe_range:
                     targets.append(enemy)
 
-            self.prev_target = xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width)
+            # Previous target location is logged.
+            # Player will prioritize attacking close to here in the next cycle.
+            self.prev_target = get_grid_pos(initial_target)
 
+            # Damages all targets in the AOE
             for target in targets:
                 target.damage()
 
 
 class Obstacle(arcade.Sprite):
-    def __init__(self, spawn_pos_grid, grids_width, grids_height, grid_width=20):
+    def __init__(self, spawn_pos, grids_width, grids_height, grid_width=20):
         super().__init__()
-        self.pos = spawn_pos_grid
+        self.pos = spawn_pos
 
         # Position the player
         self.width = grids_width * grid_width
         self.height = grids_height * grid_width
-        self.center_x = (spawn_pos_grid[0] * grid_width) + (self.width / 2)
-        self.center_y = (spawn_pos_grid[1] * grid_width) + (self.height / 2)
+        self.center_x = (spawn_pos[0] * grid_width) + (self.width / 2)
+        self.center_y = (spawn_pos[1] * grid_width) + (self.height / 2)
 
         self.grid_width = grid_width
 
@@ -105,9 +112,9 @@ class Obstacle(arcade.Sprite):
 
 class Enemy(arcade.Sprite):
 
-    def __init__(self, spawn_pos_grid, attack_range=ATTACK_RANGE, grid_width=20, update_freq=1, player=None):
+    def __init__(self, spawn_pos, attack_range=ATTACK_RANGE, grid_width=20, update_freq=1, player=None):
         super().__init__()
-        self.pos = spawn_pos_grid
+        self.pos = spawn_pos
         self.update_freq = update_freq
         self.update_timer = 0
         self.draw_path = False
@@ -123,8 +130,8 @@ class Enemy(arcade.Sprite):
         # Position the enemy
         self.height = grid_width
         self.width = grid_width
-        self.center_x = (spawn_pos_grid[0] * grid_width) + round(grid_width / 2)
-        self.center_y = (spawn_pos_grid[1] * grid_width) + round(grid_width / 2)
+        self.center_x = (spawn_pos[0] * grid_width) + round(grid_width / 2)
+        self.center_y = (spawn_pos[1] * grid_width) + round(grid_width / 2)
         self.grid_width = grid_width
 
         self.grid = None
@@ -154,7 +161,12 @@ class Enemy(arcade.Sprite):
                                           radius=3,
                                           color=arcade.color.AERO_BLUE)
 
-    def update(self, delta_time: float = 1 / 60):
+    def update_astar(self, delta_time: float = 1 / 60):
+        """
+        Generic enemy behaviour will have it move toward the player and engage it once in range.
+        :param delta_time:
+        :return:
+        """
         # Update timer
         self.update_timer += delta_time
         if self.update_timer < self.update_freq:
@@ -162,33 +174,36 @@ class Enemy(arcade.Sprite):
         self.update_timer = 0
         self.pathfind_cycles += 1
 
-        # Pathfind to player, reloading the pathfinder if necessary
-        # TODO: This is a placeholder. Eventually the reinforcement AI will decide when to pathfind to player
+        # Pathfind to player, reloading every few cycles
         if self.pathfind_cycles >= self.pathfind_cycle_threshold:
             self.pathfind_cycles = 0
-            target_pos = self.get_player_pos()
+            target_pos = get_grid_pos(self.player)
             self.path = astar.pathfind(self.grid,
-                                       xy_to_pos(self.center_x, self.center_y, self.grid_width),
+                                       get_grid_pos(self),
                                        target_pos,
                                        obstacles=(OBSTACLE,))
 
         # Move along path, deleting trails
-        # If not moving, enemies can damage the player if in range
-        if len(self.path) > 0:
+        # Attacks player as soon as in range
+        if self.player_in_range():
+            self.player.damage(1)
+            self.damage_dealt += 1
+        elif len(self.path) > 0:
             move_pos = self.path[0]
             self.center_x = ((move_pos[0] * self.grid_width) + self.grid_width / 2)
             self.center_y = ((move_pos[1] * self.grid_width) + self.grid_width / 2)
             self.path.remove(self.path[0])
-        else:
-            if self.player_in_range():
-                # Deal damage to the player
-                self.player.damage(1)
-                self.damage_dealt += 1
 
-    def update_with_action(self, action):
+    def update_qmove(self, action):
+        """
+        Makes a move according to a Q-Learning model's action.
+        Just like A-Star pathfinding, can only damage the player when not moving.
+        :param action:
+        :return:
+        """
 
         # Move to the specified location by the action
-        self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        self_pos = get_grid_pos(self)
         target_pos = (-1, -1)  # Not movable, signifies the enemy should do nothing
         if action == DOWN:
             target_pos = (self_pos[0], self_pos[1] - 1)
@@ -212,44 +227,38 @@ class Enemy(arcade.Sprite):
     def update_grid(self, grid: np.array):
         self.grid = grid
 
-    def get_personal_grid(self):
-        """
-        Returns a grid, but annotated with the personal position of this unit.
-        Very importantly, used to feed the input of the neural net.
-        :return: The environment grid, but with the personal position added in.
-        """
-        pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
-        ret = self.grid
-        ret[pos[1]][pos[0]] = UNIT_MARKER
-        return ret
-
     def toggle_path_draw(self):
         self.draw_path = not self.draw_path
 
     def player_in_range(self):
+        """
+        This check is separate from get_distance_from_player as the reward function relies on the actual distance
+        between the enemy unit and the player.
+        :return:
+        """
         if self.get_distance_from_player() <= self.range:
             return True
         return False
 
     def get_distance_from_player(self):
-        target_pos = self.get_player_pos()
-        self_pos = xy_to_pos(self.center_x, self.center_y, self.grid_width)
+        target_pos = get_grid_pos(self.player)
+        self_pos = get_grid_pos(self)
         return get_distance(target_pos, self_pos)
 
-    def get_player_pos(self):
-        target_pos = np.where(self.grid == PLAYER)
-        target_pos = (target_pos[1], target_pos[0])
-        return target_pos
-
     def movable(self, target_pos):
-        # Checks whether a particular grid square is a legal move
-        if target_pos[1] >= len(self.grid) or target_pos[1] < 0:
+        """
+        Checks whether a particular grid square is moveable.
+        Obstacles, map edges and players are invalid moves
+        :param target_pos:
+        :return:
+        """
+        if target_pos[1] >= len(self.grid[0]) or target_pos[1] < 0:
             return False
-        if target_pos[0] >= len(self.grid[0]) or target_pos[0] < 0:
+        if target_pos[0] >= len(self.grid[0][0]) or target_pos[0] < 0:
             return False
 
-        grid_object = self.grid[target_pos[1]][target_pos[0]]
-        if grid_object == OBSTACLE or grid_object == PLAYER:
+        if self.grid[C_OBSTACLE][target_pos[1]][target_pos[0]] == 1 \
+                or self.grid[C_PLAYER][target_pos[1]][target_pos[0]] == 1:
             return False
 
         return True
@@ -262,15 +271,17 @@ class Enemy(arcade.Sprite):
 
 
 def get_distance(pos1, pos2):
+    """
+    Get the distance between two different grid spaces on the map.
+    :param pos1:
+    :param pos2:
+    :return:
+    """
     return math.sqrt(pow(pos1[0] - pos2[0], 2) + pow(pos1[1] - pos2[1], 2))
 
 
-def xy_to_pos(center_x, center_y, grid_width):
-    return math.floor(center_x / grid_width), math.floor(center_y / grid_width)
-
-
 def los_exists(pos1, pos2, grid):
-
+    # TODO: Incomplete feature
     # Find the leftmost position
     left_pos = pos1
     right_pos = pos2
@@ -301,6 +312,36 @@ def los_exists(pos1, pos2, grid):
             slope_error_new = slope_error_new - 2 * (x2 - x1)
 
     return True
+
+
+def get_grid_pos(sprite: arcade.Sprite):
+    """
+    Gets the positional (x, y) representation of a Sprite on the grid,
+    where (x, y) represents the column and row position of the sprite, respectively.
+    :param sprite:
+    :return:
+    """
+    return math.floor(sprite.center_x / 20), math.floor(sprite.center_y / 20)
+
+
+def get_grid_pos_box(sprite: arcade.Sprite):
+    """
+    Same as get_grid_pos, but extended for sprites larger than a single grid tile.
+    :param sprite:
+    :return:
+    """
+    sprite_bottom_left_pos = (round((sprite.center_x - (sprite.width / 2)) / 20),
+                              round((sprite.center_y - (sprite.height / 2)) / 20))
+    sprite_top_right_pos = (round((sprite.center_x + (sprite.width / 2)) / 20),
+                            round((sprite.center_y + (sprite.height / 2)) / 20))
+
+    grid_positions = list()
+
+    for row in range(sprite_bottom_left_pos[1], sprite_top_right_pos[1]):
+        for column in range(sprite_bottom_left_pos[0], sprite_top_right_pos[0]):
+            grid_positions.append((column, row))
+
+    return grid_positions
 
 
 if __name__ == "__main__":

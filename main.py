@@ -334,8 +334,9 @@ class UnitAI2D_Window(arcade.Window):
             self.close()
 
     def on_key_press(self, key, key_modifiers):
-        # Toggles the grid
-        self.ai2d.environment.toggle_visual(key)
+        # TODO: Toggles the grid. Disabled for now.
+        # self.ai2d.environment.toggle_visual(key)
+        pass
 
 
 def main(graphics_mode=ENABLE_GRAPHICS):
