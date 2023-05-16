@@ -44,7 +44,7 @@ TAU = 0.005  # Rate at which target network is updated - separate target and pol
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-PROGRAM_MODE = 'train'  # OPTIONS: 'train', 'simulate'
+PROGRAM_MODE = 'simulate'  # OPTIONS: 'train', 'simulate'
 LOAD_MODEL = True
 SAVE_MODEL = False
 SAVE_RESULT = True
@@ -72,6 +72,7 @@ class UnitAI2D:
                  load_model=False, save_model=False,
                  policy_model_load_path=None, policy_model_save_path=None,
                  target_model_load_path=None, target_model_save_path=None,
+                 simulation_load_path=None,
                  enable_player=False):
         self.width = width
         self.height = height
@@ -107,6 +108,7 @@ class UnitAI2D:
         self.policy_model_save_path = policy_model_save_path
         self.target_model_load_path = target_model_load_path
         self.target_model_save_path = target_model_save_path
+        self.simulation_load_path = simulation_load_path
 
         # Saving episode data
         self.network_losses = list()
@@ -144,9 +146,10 @@ class UnitAI2D:
         self.episode_cycle_counter += 1
         if self.episode_cycle_counter > self.episode_cycles:
 
-            network_loss, total_reward = self.train_network()
-            self.network_losses.append(network_loss)
-            self.reward_history.append(total_reward)
+            if self.program_mode == 'train':
+                network_loss, total_reward = self.train_network()
+                self.network_losses.append(network_loss)
+                self.reward_history.append(total_reward)
 
             self.episode_counter += 1
             if self.episode_counter > self.num_episodes:
@@ -170,17 +173,18 @@ class UnitAI2D:
         next_state_maps = self.environment.get_state_maps()
 
         # Samples transitions from several random agents.
-        for i in range(self.episode_sample_size):
-            sample_index = random.randint(0, len(state_maps) - 1)
+        if self.program_mode == 'train':
+            for i in range(self.episode_sample_size):
+                sample_index = random.randint(0, len(state_maps) - 1)
 
-            state_t = torch.tensor(state_maps[sample_index], dtype=torch.float32, device=self.device)
-            next_state_t = torch.tensor(next_state_maps[sample_index], dtype=torch.float32, device=self.device)
+                state_t = torch.tensor(state_maps[sample_index], dtype=torch.float32, device=self.device)
+                next_state_t = torch.tensor(next_state_maps[sample_index], dtype=torch.float32, device=self.device)
 
-            # Pads the raw int with an extra dimension before tensor conversion
-            action_t = torch.tensor([action_list[sample_index]], dtype=torch.int64, device=self.device)
-            reward_t = torch.tensor([rewards[sample_index]], dtype=torch.float32, device=self.device)
+                # Pads the raw int with an extra dimension before tensor conversion
+                action_t = torch.tensor([action_list[sample_index]], dtype=torch.int64, device=self.device)
+                reward_t = torch.tensor([rewards[sample_index]], dtype=torch.float32, device=self.device)
 
-            self.memory.push(state_t, action_t, reward_t, next_state_t)
+                self.memory.push(state_t, action_t, reward_t, next_state_t)
 
         # Return False to continue training
         return False
@@ -225,6 +229,9 @@ class UnitAI2D:
         if self.load_model:
             self.policy_model.load_state_dict(torch.load(self.policy_model_load_path, map_location=self.device))
             self.target_model.load_state_dict(torch.load(self.target_model_load_path, map_location=self.device))
+        if self.program_mode == 'simulate':
+            self.policy_model.load_state_dict(torch.load(self.simulation_load_path, map_location=self.device))
+
         print('\nModel:')
         print(self.policy_model)
 
@@ -351,6 +358,7 @@ def main(graphics_mode=ENABLE_GRAPHICS):
                     policy_model_save_path=POLICY_MODEL_SAVE_PATH,
                     target_model_load_path=TARGET_MODEL_LOAD_PATH,
                     target_model_save_path=TARGET_MODEL_SAVE_PATH,
+                    simulation_load_path=SIMULATION_LOAD_PATH,
                     graphics_enabled=ENABLE_GRAPHICS,
                     enable_player=ENABLE_PLAYER)
 
