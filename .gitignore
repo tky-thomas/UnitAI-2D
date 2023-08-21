@@ -3,3 +3,7 @@
 venv
 Documentation
 demos
+
+# Ignores the code zip
+Code--20316601.zip
+

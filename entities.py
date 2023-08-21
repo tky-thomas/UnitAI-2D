@@ -80,7 +80,7 @@ class Player(arcade.Sprite):
                 enemy_pos = xy_to_pos(enemy.center_x, enemy.center_y, enemy.grid_width)
                 distance_from_center = get_distance(
                     xy_to_pos(initial_target.center_x, initial_target.center_y, initial_target.grid_width),
-                                enemy_pos)
+                    enemy_pos)
                 if distance_from_center <= self.aoe_range:
                     targets.append(enemy)
 
@@ -88,7 +88,8 @@ class Player(arcade.Sprite):
                 if distance_from_center <= 4:
                     scatter_positions.append(enemy_pos)
 
-            # Calculates the scatter density of enemies as long as there are at least two
+            # Calculates the scatter density of enemies, as long as there are at least two enemies in the 4-unit
+            # distance
             if len(scatter_positions) >= 2:
                 scatter_positions = np.array(scatter_positions)
                 distances = np.linalg.norm(scatter_positions[:, np.newaxis] - scatter_positions, axis=2)
@@ -100,6 +101,7 @@ class Player(arcade.Sprite):
                 target.damage()
 
         return scatter_distance
+
 
 class Obstacle(arcade.Sprite):
     def __init__(self, spawn_pos_grid, grids_width, grids_height, grid_width=20):
@@ -128,7 +130,7 @@ class Enemy(arcade.Sprite):
         self.update_freq = update_freq
         self.update_timer = 0
         self.draw_path = False
-        self.health = 3
+        self.health = 5
 
         self.path = list()
         self.pathfind_cycles = PATHFIND_CYCLES
@@ -173,10 +175,6 @@ class Enemy(arcade.Sprite):
 
     def update(self, delta_time: float = 1 / 60):
         # Update timer
-        self.update_timer += delta_time
-        if self.update_timer < self.update_freq:
-            return
-        self.update_timer = 0
         self.pathfind_cycles += 1
 
         # Pathfind to player, reloading the pathfinder if necessary
@@ -191,16 +189,16 @@ class Enemy(arcade.Sprite):
 
         # Move along path, deleting trails
         # If not moving, enemies can damage the player if in range
-        if len(self.path) > 0:
+        if self.player_in_range():
+            # Deal damage to the player
+            self.player.damage(1)
+            self.damage_dealt += 1
+        elif len(self.path) > 0:
             move_pos = self.path[0]
             self.center_x = ((move_pos[0] * self.grid_width) + self.grid_width / 2)
             self.center_y = ((move_pos[1] * self.grid_width) + self.grid_width / 2)
             self.path.remove(self.path[0])
-        else:
-            if self.player_in_range():
-                # Deal damage to the player
-                self.player.damage(1)
-                self.damage_dealt += 1
+
 
     def update_with_action(self, action):
 
@@ -287,7 +285,6 @@ def xy_to_pos(center_x, center_y, grid_width):
 
 
 def los_exists(pos1, pos2, grid):
-
     # Find the leftmost position
     left_pos = pos1
     right_pos = pos2

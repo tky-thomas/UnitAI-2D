@@ -36,7 +36,7 @@ class DeepQNetwork_FullMap(nn.Module):
     def action_translate(x):
         """
         Select an action based on the agent's prediction.
-        Random chance of exploring a random move.
+        Sample is conducted in probabilistic fashion.
         """
         x = nn.Softmax(dim=1)(x)
         action = torch.multinomial(x, num_samples=1)

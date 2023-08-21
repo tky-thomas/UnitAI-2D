@@ -34,12 +34,13 @@ ENEMY_FOCUSED = 15
 class Environment:
 
     def __init__(self, window_width, window_height, update_freq=1, graphics_enabled=False,
-                 player_enabled=False):
+                 player_enabled=False, player_aoe=0):
         self.window_width = window_width
         self.window_height = window_height
         self.update_freq = update_freq
         self.graphics_enabled = graphics_enabled
         self.player_enabled = player_enabled
+        self.player_aoe = player_aoe
 
         # All environment information is represented as a 2D tuple
         self.grids_x = round(window_width / GRID_SIZE)
@@ -62,7 +63,8 @@ class Environment:
         # Spawns in the player at the center grid
         self.player = Player((round(self.grids_x / 2),
                               round(self.grids_y / 2)),
-                             update_freq=self.update_freq)
+                             update_freq=self.update_freq,
+                             aoe_range=self.player_aoe)
 
         # Generates the obstacles
         self.obstacles = arcade.SpriteList()
@@ -122,6 +124,7 @@ class Environment:
             enemy.update_grid(self.grid)
 
         for i, enemy in enumerate(self.enemies):
+            # enemy.update(delta_time)
             enemy.update_with_action(action_list[i])
 
         # Calculates the reward for this round
@@ -274,7 +277,8 @@ class Environment:
             enemy.damage_dealt = 0
 
             # Reward being close to player
-            reward += 10 - enemy.get_distance_from_player()
+            # Distance reward is still there but less prominent
+            reward += 5 - (enemy.get_distance_from_player() / 2)
             rewards.append(reward)
 
         return rewards

@@ -20,12 +20,12 @@ WINDOW_HEIGHT = 600
 WINDOW_TITLE = 'UnitAI2D'
 ENABLE_GRAPHICS = True
 
-UPDATE_FREQUENCY = 0.05
+UPDATE_FREQUENCY = 0.001
 
 ENABLE_PLAYER = True
 
 # Machine learning hyperparameters
-NUM_EPISODES = 200
+NUM_EPISODES = 20
 EPISODE_CYCLES = 150
 
 # LEGACY: Code of the Epsilon-greedy step selection preserved for reference.
@@ -44,17 +44,17 @@ TAU = 0.005  # Rate at which target network is updated - separate target and pol
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-PROGRAM_MODE = 'train'  # OPTIONS: 'train', 'simulate'
+PROGRAM_MODE = 'simulate'  # OPTIONS: 'train', 'simulate'
 LOAD_MODEL = True
 SAVE_MODEL = True
 SAVE_RESULT = True
 
-POLICY_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_2.pt')
-POLICY_MODEL_SAVE_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_3.pt')
-TARGET_MODEL_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_target2_2.pt')
-TARGET_MODEL_SAVE_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_target2_3.pt')
-RESULT_SAVE_PATH = os.path.join(__location__, 'results/120523_no_death_ranged2_3.pt')
-SIMULATION_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_3.pt')
+POLICY_MODEL_LOAD_PATH = 'saved_models/unit_ai_2d_policy2_2.pt'
+POLICY_MODEL_SAVE_PATH = 'saved_models/unit_ai_2d_policy2_3.pt'
+TARGET_MODEL_LOAD_PATH = 'saved_models/unit_ai_2d_target2_2.pt'
+TARGET_MODEL_SAVE_PATH = 'saved_models/unit_ai_2d_target2_3.pt'
+RESULT_SAVE_PATH = 'results/experiment_3_aoe0_astar.pt'
+SIMULATION_LOAD_PATH = os.path.join(__location__, 'saved_models/unit_ai_2d_policy2_6.pt')
 
 # Random Seed
 RANDOM_SEED = None
@@ -73,12 +73,14 @@ class UnitAI2D:
                  policy_model_load_path=None, policy_model_save_path=None,
                  target_model_load_path=None, target_model_save_path=None,
                  simulation_load_path=None,
-                 enable_player=False):
+                 enable_player=False,
+                 player_aoe=0):
         self.width = width
         self.height = height
         self.graphics_enabled = graphics_enabled
         self.environment = None
         self.enable_player = enable_player
+        self.player_aoe = player_aoe
 
         self.num_episodes = num_episodes
         self.episode_counter = 1
@@ -128,7 +130,8 @@ class UnitAI2D:
         self.episode_cycle_counter = 0
         self.episode_scatter_densities = list()
         self.environment = \
-            Environment(self.width, self.height, self.update_freq, self.graphics_enabled, self.enable_player)
+            Environment(self.width, self.height, self.update_freq, self.graphics_enabled, self.enable_player,
+                        self.player_aoe)
 
     def on_update(self, delta_time):
         """
@@ -360,26 +363,35 @@ class UnitAI2D_Window(arcade.Window):
         self.ai2d.environment.toggle_visual(key)
 
 
-def main(graphics_mode=ENABLE_GRAPHICS):
+def main(graphics_mode=ENABLE_GRAPHICS,
+         policy_model_load_path=POLICY_MODEL_LOAD_PATH,
+         policy_model_save_path=POLICY_MODEL_SAVE_PATH,
+         target_model_load_path=TARGET_MODEL_LOAD_PATH,
+         target_model_save_path=TARGET_MODEL_SAVE_PATH,
+         result_save_path=RESULT_SAVE_PATH,
+         load_model=LOAD_MODEL,
+         lr=LR,
+         player_aoe=0):
     random.seed(RANDOM_SEED)
 
     ai2d = UnitAI2D(WINDOW_WIDTH, WINDOW_HEIGHT,
                     program_mode=PROGRAM_MODE,
                     num_episodes=NUM_EPISODES, episode_cycles=EPISODE_CYCLES,
                     update_freq=UPDATE_FREQUENCY,
-                    training_batch_size=BATCH_SIZE, gamma=GAMMA, lr=LR, tau=TAU,
-                    load_model=LOAD_MODEL, save_model=SAVE_MODEL,
-                    policy_model_load_path=POLICY_MODEL_LOAD_PATH,
-                    policy_model_save_path=POLICY_MODEL_SAVE_PATH,
-                    target_model_load_path=TARGET_MODEL_LOAD_PATH,
-                    target_model_save_path=TARGET_MODEL_SAVE_PATH,
+                    training_batch_size=BATCH_SIZE, gamma=GAMMA, lr=lr, tau=TAU,
+                    load_model=load_model, save_model=SAVE_MODEL,
+                    policy_model_load_path=os.path.join(__location__, policy_model_load_path),
+                    policy_model_save_path=os.path.join(__location__, policy_model_save_path),
+                    target_model_load_path=os.path.join(__location__, target_model_load_path),
+                    target_model_save_path=os.path.join(__location__, target_model_save_path),
                     simulation_load_path=SIMULATION_LOAD_PATH,
-                    graphics_enabled=ENABLE_GRAPHICS,
-                    enable_player=ENABLE_PLAYER)
+                    graphics_enabled=graphics_mode,
+                    enable_player=ENABLE_PLAYER,
+                    player_aoe=player_aoe)
 
     # If the display is enabled, arcade will run the game.
     # Otherwise, the update cycle will run without a window and draw
-    if ENABLE_GRAPHICS:
+    if graphics_mode is True:
         game = UnitAI2D_Window(WINDOW_TITLE, ai2d)
         game.setup()
         arcade.run()
@@ -402,7 +414,7 @@ def main(graphics_mode=ENABLE_GRAPHICS):
               'reward': ai2d.reward_history,
               'damage': ai2d.damage_history,
               'scatter_density': ai2d.avg_scatter_density_history}
-    with open(RESULT_SAVE_PATH, 'wb') as result_file:
+    with open(os.path.join(__location__, result_save_path), 'wb') as result_file:
         pickle.dump(result, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Training complete!")

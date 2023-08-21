@@ -9,6 +9,10 @@ def visualize(results_path):
         fp.seek(0)
         results = pickle.load(fp)
 
+    # Average Damage
+    # print(sum(results['damage']) / len(results['scatter_density']))
+    # print(sum(results['scatter_density']) / len(results['scatter_density']))
+
     # Network reward
     plt.figure()
     plt.title("UnitAI2D-Training Progress - Reward")
@@ -31,4 +35,4 @@ def visualize(results_path):
 
 
 if __name__ == "__main__":
-    visualize('results/120523_no_death_ranged.pt')
+    visualize('results/experiment_4_train.pt')
